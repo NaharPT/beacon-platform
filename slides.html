@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Beacon 1.0 — Slide Deck</title>
+<style>
+:root {
+  --primary: #1e3a5f;
+  --accent: #3b82f6;
+  --accent-light: #dbeafe;
+  --text: #1e293b;
+  --muted: #64748b;
+  --green: #16a34a;
+  --amber: #d97706;
+  --red: #dc2626;
+  --purple: #7c3aed;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1e293b; overflow: hidden; }
+
+/* Slide container */
+.deck { position: relative; width: 100vw; height: 100vh; }
+.slide {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  display: none; flex-direction: column; justify-content: center;
+  padding: 60px 80px; background: #fff; overflow: hidden;
+}
+.slide.active { display: flex; }
+
+/* Slide types */
+.slide.title-slide {
+  background: linear-gradient(135deg, var(--primary) 0%, #1e40af 50%, var(--accent) 100%);
+  color: #fff; text-align: center; justify-content: center; align-items: center;
+}
+.slide.title-slide h1 { font-size: 56px; margin-bottom: 16px; letter-spacing: -1px; }
+.slide.title-slide .subtitle { font-size: 22px; color: #bfdbfe; max-width: 700px; }
+.slide.title-slide .meta { margin-top: 40px; font-size: 14px; color: #93c5fd; }
+
+.slide.section-slide {
+  background: var(--primary); color: #fff; text-align: center;
+  justify-content: center; align-items: center;
+}
+.slide.section-slide h2 { font-size: 42px; margin-bottom: 12px; }
+.slide.section-slide p { font-size: 20px; color: #93c5fd; }
+
+/* Regular slide styling */
+.slide h2 { font-size: 32px; color: var(--primary); margin-bottom: 24px; padding-bottom: 12px; border-bottom: 3px solid var(--accent); }
+.slide h3 { font-size: 20px; color: var(--primary); margin: 16px 0 8px; }
+.slide p { font-size: 18px; line-height: 1.6; color: var(--text); margin-bottom: 12px; }
+.slide ul { font-size: 17px; line-height: 1.8; padding-left: 24px; color: var(--text); }
+.slide li { margin-bottom: 6px; }
+
+/* Columns */
+.cols { display: flex; gap: 40px; flex: 1; align-items: flex-start; }
+.cols .col { flex: 1; }
+.cols-3 { display: flex; gap: 24px; flex: 1; }
+.cols-3 .col { flex: 1; }
+
+/* Mini cards */
+.mini-card {
+  background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+  padding: 20px; margin-bottom: 12px;
+}
+.mini-card h4 { font-size: 16px; color: var(--primary); margin-bottom: 6px; }
+.mini-card p { font-size: 14px; color: var(--muted); margin: 0; }
+.mini-card ul { font-size: 14px; padding-left: 18px; }
+.mini-card li { margin-bottom: 2px; }
+
+/* Tables */
+table { width: 100%; border-collapse: collapse; font-size: 15px; }
+thead { background: var(--primary); color: #fff; }
+th { padding: 8px 12px; text-align: left; font-size: 13px; }
+td { padding: 8px 12px; border-bottom: 1px solid #e2e8f0; }
+
+/* Badges */
+.badge { display: inline-block; padding: 2px 10px; border-radius: 10px; font-size: 12px; font-weight: 600; }
+.b-green { background: #dcfce7; color: var(--green); }
+.b-amber { background: #fef3c7; color: var(--amber); }
+.b-red { background: #fee2e2; color: var(--red); }
+.b-blue { background: var(--accent-light); color: var(--accent); }
+.b-purple { background: #ede9fe; color: var(--purple); }
+
+/* Comparison */
+.compare { display: flex; gap: 24px; flex: 1; }
+.compare .side { flex: 1; padding: 24px; border-radius: 8px; }
+.compare .side.old { background: #fee2e2; border: 2px solid #fca5a5; }
+.compare .side.new { background: #dcfce7; border: 2px solid #86efac; }
+.compare .side h3 { font-size: 18px; margin-bottom: 12px; }
+.compare .side li { font-size: 15px; margin-bottom: 6px; }
+
+/* Flow */
+.flow-box { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; text-align: center; margin-bottom: 8px; font-size: 15px; }
+.flow-arrow { text-align: center; font-size: 20px; color: var(--accent); margin: 4px 0; }
+
+/* Roadmap bar */
+.roadmap { display: flex; border-radius: 8px; overflow: hidden; height: 50px; margin: 16px 0; }
+.roadmap div { display: flex; align-items: center; justify-content: center; color: #fff; font-size: 14px; font-weight: 600; }
+
+/* Bottom bar */
+.slide-footer {
+  position: fixed; bottom: 0; left: 0; right: 0; height: 40px;
+  background: var(--primary); color: #94a3b8; display: flex;
+  align-items: center; justify-content: space-between; padding: 0 24px;
+  font-size: 13px; z-index: 10;
+}
+.slide-footer .nav-hint { font-size: 12px; }
+
+/* Callout inside slide */
+.s-callout { background: var(--accent-light); border-left: 4px solid var(--accent); padding: 16px 20px; border-radius: 0 8px 8px 0; margin: 12px 0; font-size: 16px; }
+.s-callout.warn { background: #fef3c7; border-left-color: var(--amber); }
+
+/* Gate visual */
+.gates { display: flex; gap: 12px; align-items: stretch; }
+.gate { flex: 1; padding: 16px; border-radius: 8px; text-align: center; }
+.gate h4 { font-size: 15px; margin-bottom: 6px; }
+.gate p { font-size: 12px; color: var(--muted); }
+.gate.g1 { background: #dbeafe; border: 2px solid #93c5fd; }
+.gate.g2 { background: #dcfce7; border: 2px solid #86efac; }
+.gate.g3 { background: #ede9fe; border: 2px solid #c4b5fd; }
+.gate-arrow { display: flex; align-items: center; font-size: 24px; color: var(--muted); }
+
+/* Metric boxes */
+.metric-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.metric-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; text-align: center; }
+.metric-box .num { font-size: 28px; font-weight: 700; color: var(--primary); }
+.metric-box .label { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+/* Big number */
+.big-num { font-size: 64px; font-weight: 700; color: var(--accent); text-align: center; margin: 8px 0; }
+
+/* Edit Mode */
+.edit-toolbar {
+  position: fixed; top: 12px; right: 12px; z-index: 200;
+  display: flex; gap: 6px; align-items: center;
+  background: rgba(30,42,56,0.95); padding: 8px 12px; border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+}
+.edit-toolbar button {
+  background: rgba(255,255,255,0.12); border: none; color: #fff;
+  padding: 6px 12px; border-radius: 5px; cursor: pointer; font-size: 12px;
+  font-weight: 600; transition: background 0.15s;
+}
+.edit-toolbar button:hover { background: rgba(255,255,255,0.22); }
+.edit-toolbar button.active { background: var(--accent); }
+.edit-toolbar .sep { width: 1px; height: 20px; background: rgba(255,255,255,0.15); }
+.edit-toolbar .edit-status { color: #94a3b8; font-size: 11px; }
+
+body.edit-mode .editable { outline: 1px dashed #93c5fd; outline-offset: 1px; cursor: text; }
+body.edit-mode .editable:focus { outline: 2px solid var(--accent); background: rgba(219,234,254,0.15); }
+body.edit-mode td.editable { outline: none; border: 1px dashed #93c5fd; }
+body.edit-mode td.editable:focus { background: rgba(219,234,254,0.15); }
+
+.saved-indicator {
+  position: fixed; top: 60px; right: 20px; background: #16a34a; color: #fff;
+  padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 600;
+  z-index: 300; opacity: 0; transition: opacity 0.3s; pointer-events: none;
+}
+.saved-indicator.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div class="deck" id="deck">
+
+<!-- SLIDE 1: TITLE -->
+<div class="slide title-slide active">
+  <h1>BEACON 1.0</h1>
+  <div class="subtitle">One truth spine, many views.<br>The organization's standardized digestion layer for innovation & digital work.</div>
+  <div class="meta">Execution Approach &mdash; February 2026 &mdash; Confidential</div>
+</div>
+
+<!-- SLIDE 2: WHAT BEACON REPLACES -->
+<div class="slide">
+  <h2>What Beacon Replaces</h2>
+  <div class="compare">
+    <div class="side old">
+      <h3>Today</h3>
+      <ul>
+        <li>Status-update meetings to find out "what exists"</li>
+        <li>Spreadsheet trackers per function</li>
+        <li>Slide decks with stale portfolio views</li>
+        <li>Email chains asking "who owns X?"</li>
+        <li>Duplicate PoCs nobody knew about</li>
+      </ul>
+    </div>
+    <div class="side new">
+      <h3>With Beacon</h3>
+      <ul>
+        <li>Search + browse initiative cards</li>
+        <li>Single Project Card truth source</li>
+        <li>Live leadership cockpit</li>
+        <li>Owner field + Q&A engine</li>
+        <li>Duplicate detection + related initiatives</li>
+      </ul>
+    </div>
+  </div>
+  <div class="s-callout" style="margin-top:20px;">Dashboards and Q&A are just lenses over the same underlying "Project Card" truth. No parallel reporting systems.</div>
+</div>
+
+<!-- SLIDE 3: PERSONAS -->
+<div class="slide">
+  <h2>Three Personas, Three Views</h2>
+  <div class="cols-3">
+    <div class="col">
+      <div class="mini-card" style="border-top: 4px solid var(--accent);">
+        <h4>Innovators</h4>
+        <p style="font-size:12px; color: var(--muted);">Day-to-day builders</p>
+        <ul>
+          <li>Discover what exists, avoid duplication</li>
+          <li>Reuse assets, find owners/SMEs</li>
+          <li>Publish with minimal friction</li>
+        </ul>
+        <p style="margin-top:8px; font-size:13px;"><strong>Success:</strong> "Beacon check" before new PoCs</p>
+      </div>
+    </div>
+    <div class="col">
+      <div class="mini-card" style="border-top: 4px solid var(--amber);">
+        <h4>Team Leads</h4>
+        <p style="font-size:12px; color: var(--muted);">Operational oversight</p>
+        <ul>
+          <li>Know what affects my area</li>
+          <li>Track progress and risks</li>
+          <li>Allocation overview</li>
+        </ul>
+        <p style="margin-top:8px; font-size:13px;"><strong>Success:</strong> Fewer "status ping" messages</p>
+      </div>
+    </div>
+    <div class="col">
+      <div class="mini-card" style="border-top: 4px solid var(--purple);">
+        <h4>Leadership / LT</h4>
+        <p style="font-size:12px; color: var(--muted);">Strategic oversight</p>
+        <ul>
+          <li>Investment distribution</li>
+          <li>Progression and health</li>
+          <li>Intervene where needed</li>
+        </ul>
+        <p style="margin-top:8px; font-size:13px;"><strong>Success:</strong> Beacon before steering sessions</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 4: PROJECT CARD -->
+<div class="slide">
+  <h2>The Project Card &mdash; Beacon's Truth Unit</h2>
+  <p style="font-size:16px; color:var(--muted); margin-bottom:16px;">Easy to maintain, strong enough to power both Q&A and dashboards.</p>
+  <div class="cols">
+    <div class="col">
+      <div class="mini-card">
+        <h4>Identity & Routing</h4>
+        <p>Beacon ID, Title, Owner, Function/Domain, Stage, Truth State, Update Cadence</p>
+      </div>
+      <div class="mini-card">
+        <h4>Intent</h4>
+        <p>Problem statement, Scope, Target users, Expected outcomes (1-3 categories)</p>
+      </div>
+      <div class="mini-card">
+        <h4>Evidence</h4>
+        <p>Evidence links (one-pager, deck, demo), Data sources, Validation notes</p>
+      </div>
+    </div>
+    <div class="col">
+      <div class="mini-card">
+        <h4>Health, Risk, Mitigation</h4>
+        <p>Delivery health (G/A/R + reason), Milestones (3-5), Risks with impact + mitigation</p>
+      </div>
+      <div class="mini-card">
+        <h4>Investment & Resourcing</h4>
+        <p>Budget band, Source split (DDIT/Function/Mixed), FTE band, Key roles</p>
+      </div>
+      <div class="mini-card">
+        <h4>Links & Relationships</h4>
+        <p>Tags/streams, Dependencies, Related initiatives (manual + auto-suggest)</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 5: PUBLICATION GATES -->
+<div class="slide">
+  <h2>Publication Gates &mdash; Trust by Design</h2>
+  <p style="margin-bottom:20px;">Strict enough to preserve trust. Not so strict that nothing gets published.</p>
+  <div class="gates">
+    <div class="gate g1">
+      <h4>Draft</h4>
+      <p>Contributors only, not searchable</p>
+      <p style="margin-top:8px; font-size:13px; color:var(--text);"><strong>Requires:</strong> Identity + intent (owner, title, domain, problem statement)</p>
+    </div>
+    <div class="gate-arrow">&rarr;</div>
+    <div class="gate g2">
+      <h4>Searchable</h4>
+      <p>Default for innovators</p>
+      <p style="margin-top:8px; font-size:13px; color:var(--text);"><strong>Requires:</strong> Evidence link (1 min), Stage + Truth State, Update cadence</p>
+    </div>
+    <div class="gate-arrow">&rarr;</div>
+    <div class="gate g3">
+      <h4>Leadership-Visible</h4>
+      <p>Eligible for cockpit counts</p>
+      <p style="margin-top:8px; font-size:13px; color:var(--text);"><strong>Requires:</strong> Health (G/A/R + reason), Budget band + source, 1 milestone or 1 risk</p>
+    </div>
+  </div>
+  <div class="s-callout warn" style="margin-top:24px;">
+    <strong>Staleness rule:</strong> If last update > 90 days: flagged "Stale" and excluded from leadership "green" totals until refreshed.
+  </div>
+</div>
+
+<!-- SLIDE 6: INNOVATOR VIEW -->
+<div class="slide">
+  <h2>Innovator View: Discovery Hub</h2>
+  <div class="cols">
+    <div class="col" style="flex: 1.3;">
+      <div class="mini-card" style="border: 2px solid var(--accent);">
+        <h4>Search-First Homepage</h4>
+        <ul>
+          <li>Prominent search bar with filters (domain, stream, stage, tags)</li>
+          <li>Results as initiative card tiles</li>
+          <li>Full card detail with all fields + evidence links</li>
+          <li>"Related initiatives" auto-suggested</li>
+        </ul>
+      </div>
+      <div class="mini-card">
+        <h4>Submit/Update Flow</h4>
+        <ul>
+          <li>Multi-step form with save-as-draft</li>
+          <li>Duplicate detection: "Similar initiatives found" (soft gate)</li>
+          <li>Auto-validation against publication gate requirements</li>
+        </ul>
+      </div>
+    </div>
+    <div class="col">
+      <div class="mini-card">
+        <h4>"What Changed" Feed</h4>
+        <ul>
+          <li>New initiatives published</li>
+          <li>Stage changes</li>
+          <li>Health status changes</li>
+          <li>New evidence uploaded</li>
+        </ul>
+      </div>
+      <div class="mini-card">
+        <h4>Q&A Dialogue</h4>
+        <ul>
+          <li>Grounded in card data + evidence</li>
+          <li>Every answer has citations</li>
+          <li>"Not available yet" when data missing</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 7: TEAM LEAD VIEW -->
+<div class="slide">
+  <h2>Team Lead View: My Area</h2>
+  <div class="cols">
+    <div class="col" style="flex:1.2;">
+      <div class="mini-card" style="border: 2px solid var(--amber);">
+        <h4>"My Area" Dashboard</h4>
+        <ul>
+          <li>Initiatives I <strong>own</strong> (by stage)</li>
+          <li>Initiatives <strong>impacting</strong> my function (by stage)</li>
+          <li>At risk / blocked count with reasons</li>
+        </ul>
+      </div>
+      <div class="mini-card">
+        <h4>Operational Health Board</h4>
+        <ul>
+          <li>Kanban columns: On Track / At Risk / Blocked</li>
+          <li>Each card shows health reason + owner</li>
+          <li>Top 10 impacting sorted by urgency</li>
+        </ul>
+      </div>
+    </div>
+    <div class="col">
+      <div class="mini-card">
+        <h4>Risk & Mitigation Register</h4>
+        <ul>
+          <li>Per-initiative risks aggregated across area</li>
+          <li>Impact (H/M/L) + mitigation status</li>
+          <li>Actions requiring my attention</li>
+        </ul>
+      </div>
+      <div class="mini-card">
+        <h4>Resourcing Summary</h4>
+        <ul>
+          <li>FTE bands aggregated by function</li>
+          <li>Key roles involved</li>
+          <li>Allocation overview</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 8: LEADERSHIP COCKPIT (MONEY SLIDE) -->
+<div class="slide">
+  <h2>Leadership Cockpit: Portfolio Control Room</h2>
+  <div class="cols-3" style="margin-bottom:12px;">
+    <div class="col">
+      <div class="mini-card" style="border-top: 3px solid var(--accent); text-align:center;">
+        <h4>Portfolio Overview</h4>
+        <p style="font-size:13px;">Initiatives by stage (bar chart)<br>By stream/theme (treemap)<br>Health distribution (donut)</p>
+      </div>
+    </div>
+    <div class="col">
+      <div class="mini-card" style="border-top: 3px solid var(--green); text-align:center;">
+        <h4>Investment Distribution</h4>
+        <p style="font-size:13px;">Budget bands by theme<br>Source split (DDIT vs Function vs Mixed)<br>Spend status overview</p>
+      </div>
+    </div>
+    <div class="col">
+      <div class="mini-card" style="border-top: 3px solid var(--red); text-align:center;">
+        <h4>Attention Needed</h4>
+        <p style="font-size:13px;">Stale initiatives<br>Reds + top Ambers + mitigation status<br>Missing owner or evidence</p>
+      </div>
+    </div>
+  </div>
+  <div class="cols">
+    <div class="col">
+      <div class="mini-card" style="border-left: 4px solid var(--purple);">
+        <h4>"My Function's Role"</h4>
+        <p style="font-size:14px;">What we own | What impacts us | What we fund</p>
+      </div>
+    </div>
+    <div class="col">
+      <div class="mini-card" style="border-left: 4px solid var(--accent);">
+        <h4>Pre-Digested Brief Tiles</h4>
+        <p style="font-size:14px;">3-7 key takeaways auto-generated from data. Click any tile to drill down to evidence.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 9: Q&A ENGINE -->
+<div class="slide">
+  <h2>Q&A Engine &mdash; A Responsible Librarian</h2>
+  <div class="cols">
+    <div class="col" style="flex:1.2;">
+      <div class="flow-box"><strong>1. User asks a question</strong></div>
+      <div class="flow-arrow">&darr;</div>
+      <div class="flow-box"><strong>2. Retrieve</strong> from Project Card data + linked evidence<br><span style="font-size:13px;">Structured search (SQL) + Semantic search (embeddings)</span></div>
+      <div class="flow-arrow">&darr;</div>
+      <div class="flow-box"><strong>3. Ground & Respond</strong> with inline citations<br><span style="font-size:13px;">[Card: BCN-0042, Field: delivery_health]</span></div>
+      <div class="flow-arrow">&darr;</div>
+      <div class="flow-box"><strong>4. If missing:</strong> "Not available in Beacon yet.<br>The [field] would need to be filled by [owner role]."</div>
+    </div>
+    <div class="col">
+      <div class="mini-card" style="border-left: 4px solid var(--green);">
+        <h4>Allowed (v1.0)</h4>
+        <ul>
+          <li>Summarize an initiative</li>
+          <li>Compare (structured fields)</li>
+          <li>List by filter</li>
+          <li>Status / health / budget band</li>
+          <li>Identify owners + evidence</li>
+          <li>Surface risks + mitigations</li>
+        </ul>
+      </div>
+      <div class="mini-card" style="border-left: 4px solid var(--red);">
+        <h4>Disallowed (v1.0)</h4>
+        <ul>
+          <li>Guess budget beyond bands</li>
+          <li>Infer ownership if not stated</li>
+          <li>Claim strategy unless Committed</li>
+          <li>Recommend actions</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 10: TRUST BY DESIGN -->
+<div class="slide">
+  <h2>Trust by Design</h2>
+  <p style="margin-bottom:20px;">Beacon earns leadership trust through systematic constraints, not promises.</p>
+  <div class="cols-3">
+    <div class="col">
+      <div class="mini-card" style="border-top: 3px solid var(--green); min-height: 160px;">
+        <h4>Grounding Rules</h4>
+        <ul>
+          <li>Every factual claim traceable to a card field or evidence doc</li>
+          <li>Inline citations on every Q&A answer</li>
+          <li>Confidence flags: grounded / partial / not available</li>
+        </ul>
+      </div>
+    </div>
+    <div class="col">
+      <div class="mini-card" style="border-top: 3px solid var(--amber); min-height: 160px;">
+        <h4>Staleness Enforcement</h4>
+        <ul>
+          <li>90-day staleness flag</li>
+          <li>Auto-downgrade from leadership cockpit</li>
+          <li>Excluded from "green" health totals</li>
+        </ul>
+      </div>
+    </div>
+    <div class="col">
+      <div class="mini-card" style="border-top: 3px solid var(--accent); min-height: 160px;">
+        <h4>Publication Gates</h4>
+        <ul>
+          <li>3-tier progressive requirements</li>
+          <li>Auto-validation before tier promotion</li>
+          <li>Domain curator approval for leadership visibility</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="s-callout" style="margin-top:16px;">
+    <strong>Failure mode design:</strong> When data is missing, Beacon names the gap, names the likely owner, and suggests the fix. It never fabricates.
+  </div>
+</div>
+
+<!-- SLIDE 11: ROADMAP -->
+<div class="slide">
+  <h2>Roadmap</h2>
+  <div class="roadmap" style="margin-bottom:24px;">
+    <div style="flex:1.5; background: var(--accent);">v0.1: Truth Spine</div>
+    <div style="flex:3; background: #1d4ed8;">v1.0: MVP (All 3 Personas)</div>
+    <div style="flex:3; background: var(--primary);">v2.0: Scale + Integrate</div>
+  </div>
+  <div class="cols-3">
+    <div class="col">
+      <div class="mini-card" style="border-top: 3px solid var(--accent);">
+        <h4>v0.1 &mdash; Stabilize</h4>
+        <ul>
+          <li>Project Card v0 + controlled vocab</li>
+          <li>Intake/publish workflow</li>
+          <li>15-20 curated initiatives</li>
+          <li>Grounded Q&A rules</li>
+          <li>Staleness flagging</li>
+        </ul>
+        <p style="margin-top:8px; font-size:13px; color:var(--green);"><strong>Exit:</strong> New initiative onboarded in &lt;30 min. 10 questions answered correctly.</p>
+      </div>
+    </div>
+    <div class="col">
+      <div class="mini-card" style="border-top: 3px solid #1d4ed8;">
+        <h4>v1.0 &mdash; MVP</h4>
+        <ul>
+          <li>Innovator: search + cards + submit</li>
+          <li>Team lead: My Area + health + risks</li>
+          <li>Leadership: cockpit + investment</li>
+          <li>Budget bands populated</li>
+          <li>Pilot running</li>
+        </ul>
+        <p style="margin-top:8px; font-size:13px; color:var(--green);"><strong>Exit:</strong> 50 initiatives, 80% searchable, 60% LT-visible, &lt;20% stale.</p>
+      </div>
+    </div>
+    <div class="col">
+      <div class="mini-card" style="border-top: 3px solid var(--primary);">
+        <h4>v2.0 &mdash; Scale</h4>
+        <ul>
+          <li>Finance integration (real figures)</li>
+          <li>Automated ingestion (doc parsing)</li>
+          <li>Dependency graph v1</li>
+          <li>Proactive push outputs</li>
+          <li>Extended user base</li>
+        </ul>
+        <p style="margin-top:8px; font-size:13px; color:var(--green);"><strong>Exit:</strong> Beacon is default portfolio reference in steering routines.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 12: PILOT PLAN -->
+<div class="slide">
+  <h2>Pilot Plan & Metrics</h2>
+  <div class="cols">
+    <div class="col">
+      <h3>Pilot Cohorts</h3>
+      <table>
+        <thead><tr><th>Cohort</th><th>Size</th><th>Duration</th></tr></thead>
+        <tbody>
+          <tr><td>Innovator Team A</td><td>8-10</td><td>6 weeks</td></tr>
+          <tr><td>Innovator Team B</td><td>8-10</td><td>6 weeks</td></tr>
+          <tr><td>Team Lead cohort</td><td>4-6</td><td>6 weeks</td></tr>
+          <tr><td>Leadership cohort</td><td>3-4</td><td>4 weeks</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="col">
+      <h3>Key Metrics</h3>
+      <div class="metric-grid">
+        <div class="metric-box"><div class="num">30+</div><div class="label">Weekly Active Users</div></div>
+        <div class="metric-box"><div class="num">>90%</div><div class="label">Cited Q&A Answers</div></div>
+        <div class="metric-box"><div class="num">&lt;20%</div><div class="label">Staleness Rate</div></div>
+        <div class="metric-box"><div class="num">>80%</div><div class="label">LT Cards Complete</div></div>
+        <div class="metric-box"><div class="num">30%+</div><div class="label">Prep Time Reduction</div></div>
+        <div class="metric-box"><div class="num">2+</div><div class="label">Duplicates Avoided</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 13: OPERATING MODEL -->
+<div class="slide">
+  <h2>Operating Model</h2>
+  <div class="cols">
+    <div class="col" style="flex:1.3;">
+      <h3>Roles</h3>
+      <table>
+        <thead><tr><th>Role</th><th>Key Activities</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Product Owner</strong></td><td>Roadmap, prioritization, stakeholder alignment</td></tr>
+          <tr><td><strong>Content Steward</strong></td><td>Taxonomy, quality gates, staleness chasing, onboarding</td></tr>
+          <tr><td><strong>Domain Curators</strong> (5-8)</td><td>Review cards, approve leadership-visible tier</td></tr>
+          <tr><td><strong>Initiative Owners</strong> (50+)</td><td>Maintain their own cards (30-60 min/quarter)</td></tr>
+          <tr><td><strong>Tech Owner</strong></td><td>Platform reliability, access control, integrations</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="col">
+      <h3>Cadences</h3>
+      <div class="mini-card" style="border-left: 3px solid var(--accent);">
+        <h4>Weekly</h4>
+        <p>Triage submissions, review stale flags, check Q&A failures</p>
+      </div>
+      <div class="mini-card" style="border-left: 3px solid var(--amber);">
+        <h4>Monthly</h4>
+        <p>Cockpit hygiene review, content quality audit, metrics</p>
+      </div>
+      <div class="mini-card" style="border-left: 3px solid var(--purple);">
+        <h4>Quarterly</h4>
+        <p>Taxonomy cleanup, retirement review, schema evolution, roadmap</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 14: WHAT WE NEED -->
+<div class="slide">
+  <h2>What We Need</h2>
+  <div class="cols-3">
+    <div class="col">
+      <div class="mini-card" style="min-height: 200px; border-top: 3px solid var(--red);">
+        <h4>Critical (v0.1)</h4>
+        <ul>
+          <li><strong>Sponsor sign-off</strong> on Beacon as the portfolio truth system</li>
+          <li><strong>Platform decision</strong> (D1) + IT alignment</li>
+          <li><strong>1 leadership champion</strong> who will use the cockpit</li>
+        </ul>
+      </div>
+    </div>
+    <div class="col">
+      <div class="mini-card" style="min-height: 200px; border-top: 3px solid var(--amber);">
+        <h4>Important (v1.0)</h4>
+        <ul>
+          <li><strong>Content Steward</strong> (named role, 20%+ time)</li>
+          <li><strong>5-8 Domain Curators</strong> (1 per function)</li>
+          <li><strong>IT support</strong> for platform setup + maintenance</li>
+          <li><strong>John + Luisa</strong> alignment</li>
+        </ul>
+      </div>
+    </div>
+    <div class="col">
+      <div class="mini-card" style="min-height: 200px; border-top: 3px solid var(--green);">
+        <h4>Nice to Have (v2.0)</h4>
+        <ul>
+          <li>Finance system integration access</li>
+          <li>Extended LLM/AI budget for advanced Q&A</li>
+          <li>Dedicated development capacity</li>
+          <li>Broader org change management support</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIDE 15: NEXT STEPS -->
+<div class="slide">
+  <h2>Next Steps</h2>
+  <div class="cols">
+    <div class="col">
+      <h3>This Week</h3>
+      <table>
+        <tbody>
+          <tr><td style="width:30px; font-weight:700; color:var(--accent);">1</td><td>Post Beacon 1.0 Spec to Confluence</td></tr>
+          <tr><td style="font-weight:700; color:var(--accent);">2</td><td>Run Wednesday session: lock D1-D8 decisions</td></tr>
+          <tr><td style="font-weight:700; color:var(--accent);">3</td><td>Check Luisa availability for domain curator</td></tr>
+          <tr><td style="font-weight:700; color:var(--accent);">4</td><td>Brief John on Beacon (frame as amplifier)</td></tr>
+        </tbody>
+      </table>
+      <h3 style="margin-top:20px;">Week 1-2</h3>
+      <table>
+        <tbody>
+          <tr><td style="width:30px; font-weight:700; color:var(--accent);">5</td><td>Set up platform (per D1 decision)</td></tr>
+          <tr><td style="font-weight:700; color:var(--accent);">6</td><td>Write Card Population Guide</td></tr>
+          <tr><td style="font-weight:700; color:var(--accent);">7</td><td>Fill first 5 cards personally</td></tr>
+          <tr><td style="font-weight:700; color:var(--accent);">8</td><td>Recruit leadership champion (Iman?)</td></tr>
+          <tr><td style="font-weight:700; color:var(--accent);">9</td><td>Schedule first Card Jam workshop</td></tr>
+          <tr><td style="font-weight:700; color:var(--accent);">10</td><td>Start building slide deck</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="col" style="display:flex; align-items:center; justify-content:center;">
+      <div style="text-align:center;">
+        <div class="big-num">v0.1</div>
+        <p style="font-size:18px; color:var(--muted);">First milestone target</p>
+        <p style="margin-top:16px; font-size:15px;">15-20 initiatives loaded<br>10 standard questions answered<br>Stakeholder demo complete</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /deck -->
+
+<!-- FOOTER -->
+<div class="slide-footer">
+  <span>Beacon 1.0 &mdash; Confidential</span>
+  <span id="counter">1 / 15</span>
+  <span class="nav-hint">Arrow keys or click to navigate</span>
+</div>
+
+<!-- EDIT TOOLBAR -->
+<div class="edit-toolbar" id="editToolbar">
+  <button id="editToggle" onclick="toggleEdit(event)">Edit Mode</button>
+  <div class="sep"></div>
+  <button id="exportBtn" onclick="exportData(event)" style="display:none;">Export</button>
+  <button id="resetBtn" onclick="resetEdits(event)" style="display:none;">Reset</button>
+  <span class="edit-status" id="editStatus"></span>
+</div>
+<div class="saved-indicator" id="savedIndicator">Saved</div>
+
+<script>
+// --- Slide Navigation ---
+const slides = document.querySelectorAll('.slide');
+const counter = document.getElementById('counter');
+let current = 0;
+let editMode = false;
+
+function show(n) {
+  if (n < 0 || n >= slides.length) return;
+  slides[current].classList.remove('active');
+  current = n;
+  slides[current].classList.add('active');
+  counter.textContent = (current + 1) + ' / ' + slides.length;
+}
+
+document.addEventListener('keydown', e => {
+  if (editMode && e.key !== 'Escape') return; // don't navigate while editing
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') { e.preventDefault(); show(current + 1); }
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); show(current - 1); }
+  if (e.key === 'Home') { e.preventDefault(); show(0); }
+  if (e.key === 'End') { e.preventDefault(); show(slides.length - 1); }
+  if (e.key === 'Escape' && editMode) toggleEdit();
+});
+
+document.addEventListener('click', e => {
+  if (editMode) return; // don't navigate while editing
+  if (e.target.closest('.edit-toolbar')) return;
+  if (e.clientX > window.innerWidth / 2) show(current + 1);
+  else show(current - 1);
+});
+
+// --- Edit Mode ---
+const STORAGE_KEY = 'beacon-slides-edits';
+const deckEl = document.getElementById('deck');
+const originalHTML = deckEl.innerHTML;
+
+// Restore saved edits on load
+(function restoreEdits() {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved) {
+    deckEl.innerHTML = saved;
+    // Re-query slides after restore
+    document.getElementById('editStatus').textContent = 'Saved edits loaded';
+    // Re-init: show first slide
+    document.querySelectorAll('.slide').forEach((s, i) => {
+      s.classList.toggle('active', i === 0);
+    });
+  }
+})();
+
+function toggleEdit(e) {
+  if (e) e.stopPropagation();
+  editMode = !editMode;
+  document.body.classList.toggle('edit-mode', editMode);
+  document.getElementById('editToggle').classList.toggle('active', editMode);
+  document.getElementById('exportBtn').style.display = editMode ? '' : 'none';
+  document.getElementById('resetBtn').style.display = editMode ? '' : 'none';
+  document.getElementById('editStatus').textContent = editMode ? 'Click text to edit (Esc to exit)' : '';
+
+  if (editMode) {
+    enableEditing();
+  } else {
+    disableEditing();
+    saveEdits();
+  }
+}
+
+function enableEditing() {
+  const selectors = [
+    '.slide h1', '.slide h2', '.slide h3', '.slide h4',
+    '.slide p', '.slide li', '.slide td',
+    '.mini-card h4', '.mini-card p',
+    '.subtitle', '.meta', '.s-callout',
+    '.flow-box', '.big-num',
+    '.metric-box .num', '.metric-box .label'
+  ];
+  deckEl.querySelectorAll(selectors.join(',')).forEach(el => {
+    el.setAttribute('contenteditable', 'true');
+    el.classList.add('editable');
+  });
+}
+
+function disableEditing() {
+  deckEl.querySelectorAll('[contenteditable]').forEach(el => {
+    el.removeAttribute('contenteditable');
+    el.classList.remove('editable');
+  });
+}
+
+function saveEdits() {
+  localStorage.setItem(STORAGE_KEY, deckEl.innerHTML);
+  const indicator = document.getElementById('savedIndicator');
+  indicator.classList.add('show');
+  setTimeout(() => indicator.classList.remove('show'), 1500);
+}
+
+// Auto-save while editing
+let saveTimer;
+deckEl.addEventListener('input', () => {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveEdits, 2000);
+  document.getElementById('editStatus').textContent = 'Editing...';
+});
+
+function exportData(e) {
+  if (e) e.stopPropagation();
+  const html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+  const blob = new Blob([html], { type: 'text/html' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'beacon-slides-edited.html';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function resetEdits(e) {
+  if (e) e.stopPropagation();
+  if (!confirm('Reset all edits to the original version?')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  deckEl.innerHTML = originalHTML;
+  document.querySelectorAll('.slide').forEach((s, i) => {
+    s.classList.toggle('active', i === 0);
+  });
+  current = 0;
+  counter.textContent = '1 / ' + document.querySelectorAll('.slide').length;
+  if (editMode) toggleEdit();
+  document.getElementById('editStatus').textContent = 'Reset to original';
+}
+</script>
+
+</body>
+</html>

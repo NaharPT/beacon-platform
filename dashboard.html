@@ -1,0 +1,1517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Beacon 1.0 — Execution Approach</title>
+<style>
+:root {
+  --bg: #f1f5f9;
+  --card: #ffffff;
+  --primary: #1e3a5f;
+  --accent: #3b82f6;
+  --accent-light: #dbeafe;
+  --text: #1e293b;
+  --text-secondary: #64748b;
+  --border: #e2e8f0;
+  --green: #16a34a;
+  --green-bg: #dcfce7;
+  --amber: #d97706;
+  --amber-bg: #fef3c7;
+  --red: #dc2626;
+  --red-bg: #fee2e2;
+  --purple: #7c3aed;
+  --purple-bg: #ede9fe;
+  --sidebar-w: 260px;
+  --radius: 8px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+
+/* Sidebar */
+nav.sidebar {
+  position: fixed; top: 0; left: 0; width: var(--sidebar-w); height: 100vh;
+  background: var(--primary); color: #cbd5e1; overflow-y: auto;
+  padding: 24px 0; z-index: 100;
+}
+nav.sidebar .logo { padding: 0 20px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 12px; }
+nav.sidebar .logo h1 { font-size: 22px; color: #fff; letter-spacing: 1px; }
+nav.sidebar .logo span { font-size: 12px; color: #94a3b8; display: block; margin-top: 2px; }
+nav.sidebar .nav-group { padding: 8px 0; }
+nav.sidebar .nav-group-title { font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: #64748b; padding: 8px 20px 4px; }
+nav.sidebar a {
+  display: block; padding: 7px 20px; font-size: 13px; color: #94a3b8;
+  text-decoration: none; transition: all 0.15s; border-left: 3px solid transparent;
+}
+nav.sidebar a:hover, nav.sidebar a.active { color: #fff; background: rgba(255,255,255,0.07); border-left-color: var(--accent); }
+
+/* Main */
+main { margin-left: var(--sidebar-w); padding: 32px 40px 80px; max-width: 1100px; }
+
+/* Hero */
+.hero { background: linear-gradient(135deg, var(--primary) 0%, #2563eb 100%); color: #fff; border-radius: var(--radius); padding: 48px; margin-bottom: 32px; }
+.hero h1 { font-size: 36px; margin-bottom: 8px; }
+.hero .subtitle { font-size: 16px; color: #bfdbfe; margin-bottom: 24px; }
+.hero .stats { display: flex; gap: 32px; flex-wrap: wrap; }
+.hero .stat { text-align: center; }
+.hero .stat .num { font-size: 32px; font-weight: 700; }
+.hero .stat .label { font-size: 12px; color: #bfdbfe; text-transform: uppercase; letter-spacing: 1px; }
+
+/* Sections */
+section { margin-bottom: 40px; }
+section > h2 {
+  font-size: 22px; color: var(--primary); padding-bottom: 8px;
+  border-bottom: 2px solid var(--accent); margin-bottom: 20px;
+}
+section > h3 { font-size: 17px; color: var(--primary); margin: 20px 0 12px; }
+section > p, section > ul { margin-bottom: 12px; }
+section ul { padding-left: 20px; }
+section ul li { margin-bottom: 4px; }
+
+/* Cards */
+.card {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 24px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.card h3 { font-size: 16px; color: var(--primary); margin-bottom: 8px; }
+.card p { color: var(--text-secondary); font-size: 14px; }
+
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-bottom: 16px; }
+.card-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px; }
+@media (max-width: 1000px) { .card-grid-3 { grid-template-columns: 1fr; } }
+
+/* Tables */
+table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 14px; background: var(--card); border-radius: var(--radius); overflow: hidden; }
+thead { background: var(--primary); color: #fff; }
+th { padding: 10px 14px; text-align: left; font-weight: 600; font-size: 13px; }
+td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+tr:last-child td { border-bottom: none; }
+tr:hover { background: #f8fafc; }
+
+/* Badges */
+.badge {
+  display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 600;
+}
+.badge-green { background: var(--green-bg); color: var(--green); }
+.badge-amber { background: var(--amber-bg); color: var(--amber); }
+.badge-red { background: var(--red-bg); color: var(--red); }
+.badge-blue { background: var(--accent-light); color: var(--accent); }
+.badge-purple { background: var(--purple-bg); color: var(--purple); }
+.badge-rec { background: #dcfce7; color: #16a34a; border: 1px solid #86efac; font-size: 11px; }
+
+/* Collapsible */
+details { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 12px; }
+details summary {
+  padding: 14px 20px; cursor: pointer; font-weight: 600; font-size: 15px; color: var(--primary);
+  list-style: none; display: flex; align-items: center; gap: 8px;
+}
+details summary::before { content: '\25B6'; font-size: 10px; transition: transform 0.2s; }
+details[open] summary::before { transform: rotate(90deg); }
+details summary::-webkit-details-marker { display: none; }
+details .detail-body { padding: 0 20px 20px; }
+
+/* Timeline */
+.timeline { position: relative; padding-left: 28px; }
+.timeline::before { content: ''; position: absolute; left: 8px; top: 4px; bottom: 4px; width: 2px; background: var(--accent); }
+.timeline-item { position: relative; margin-bottom: 20px; }
+.timeline-item::before {
+  content: ''; position: absolute; left: -24px; top: 6px; width: 12px; height: 12px;
+  border-radius: 50%; background: var(--accent); border: 2px solid #fff;
+}
+.timeline-item h4 { font-size: 14px; color: var(--primary); }
+.timeline-item p { font-size: 13px; color: var(--text-secondary); }
+
+/* Flow diagram (text-based) */
+.flow { background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; font-family: 'Consolas', 'Courier New', monospace; font-size: 13px; line-height: 1.8; white-space: pre-wrap; margin-bottom: 16px; color: var(--text-secondary); }
+.flow strong { color: var(--primary); }
+
+/* Code block */
+.code-block { background: #1e293b; color: #e2e8f0; padding: 20px; border-radius: var(--radius); font-family: 'Consolas', monospace; font-size: 13px; line-height: 1.7; white-space: pre-wrap; margin-bottom: 16px; overflow-x: auto; }
+
+/* Callout */
+.callout { border-left: 4px solid var(--accent); background: var(--accent-light); padding: 16px 20px; border-radius: 0 var(--radius) var(--radius) 0; margin-bottom: 16px; font-size: 14px; }
+.callout.warn { border-left-color: var(--amber); background: var(--amber-bg); }
+.callout.danger { border-left-color: var(--red); background: var(--red-bg); }
+.callout.success { border-left-color: var(--green); background: var(--green-bg); }
+.callout strong { display: block; margin-bottom: 4px; }
+
+/* Roadmap visual */
+.roadmap-bar { display: flex; border-radius: var(--radius); overflow: hidden; height: 40px; margin-bottom: 16px; }
+.roadmap-bar div { display: flex; align-items: center; justify-content: center; color: #fff; font-size: 13px; font-weight: 600; }
+
+/* Edit Mode */
+.edit-toolbar {
+  position: fixed; bottom: 20px; right: 20px; z-index: 200;
+  display: flex; gap: 8px; align-items: center;
+  background: var(--primary); padding: 10px 16px; border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.25); transition: opacity 0.2s;
+}
+.edit-toolbar button {
+  background: rgba(255,255,255,0.12); border: none; color: #fff;
+  padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 13px;
+  font-weight: 600; transition: background 0.15s; white-space: nowrap;
+}
+.edit-toolbar button:hover { background: rgba(255,255,255,0.22); }
+.edit-toolbar button.active { background: var(--accent); }
+.edit-toolbar .sep { width: 1px; height: 24px; background: rgba(255,255,255,0.15); }
+.edit-toolbar .edit-status { color: #94a3b8; font-size: 11px; white-space: nowrap; }
+
+body.edit-mode .editable { outline: 1px dashed #93c5fd; outline-offset: 1px; cursor: text; }
+body.edit-mode .editable:focus { outline: 2px solid var(--accent); background: var(--accent-light); }
+body.edit-mode td.editable { outline: none; border: 1px dashed #93c5fd; }
+body.edit-mode td.editable:focus { background: var(--accent-light); border-color: var(--accent); }
+body.edit-mode .add-row-btn { display: block !important; }
+.add-row-btn {
+  display: none !important; margin: 4px 0; padding: 4px 12px; font-size: 12px;
+  background: var(--accent-light); color: var(--accent); border: 1px dashed var(--accent);
+  border-radius: 4px; cursor: pointer; width: 100%;
+}
+.saved-indicator {
+  position: fixed; top: 20px; right: 20px; background: var(--green); color: #fff;
+  padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600;
+  z-index: 300; opacity: 0; transition: opacity 0.3s; pointer-events: none;
+}
+.saved-indicator.show { opacity: 1; }
+
+/* Print */
+@media print {
+  nav.sidebar { display: none; }
+  main { margin-left: 0; padding: 20px; }
+  .hero { padding: 24px; }
+  details { break-inside: avoid; }
+  details[open] { break-inside: auto; }
+  .edit-toolbar { display: none; }
+  .add-row-btn { display: none !important; }
+}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<nav class="sidebar" id="sidebar">
+  <div class="logo">
+    <h1>BEACON</h1>
+    <span>1.0 Execution Approach</span>
+  </div>
+  <div class="nav-group">
+    <div class="nav-group-title">Overview</div>
+    <a href="#hero">Executive Summary</a>
+    <a href="#north-star">North Star & Mantra</a>
+    <a href="#personas">Personas & JTBD</a>
+  </div>
+  <div class="nav-group">
+    <div class="nav-group-title">I. Strategic Foundation</div>
+    <a href="#positioning">Positioning & Narrative</a>
+    <a href="#decisions">8 Critical Decisions</a>
+    <a href="#stakeholders">Stakeholder Map</a>
+  </div>
+  <div class="nav-group">
+    <div class="nav-group-title">II. Architecture</div>
+    <a href="#platform">Platform Options</a>
+    <a href="#qa-engine">Q&A Engine Design</a>
+    <a href="#data-model">Data Model</a>
+  </div>
+  <div class="nav-group">
+    <div class="nav-group-title">III. Execution</div>
+    <a href="#phase01">Phase 0.1 (Weeks 1-6)</a>
+    <a href="#phase10">Phase 1.0 (Sprints 1-8)</a>
+    <a href="#phase20">Phase 2.0 Themes</a>
+  </div>
+  <div class="nav-group">
+    <div class="nav-group-title">IV. Adoption</div>
+    <a href="#seeding">Content Seeding</a>
+    <a href="#change-mgmt">Change Management</a>
+  </div>
+  <div class="nav-group">
+    <div class="nav-group-title">V. Governance</div>
+    <a href="#operating-model">Operating Model</a>
+    <a href="#metrics">Metrics & Pilot</a>
+    <a href="#risks">Risk Register</a>
+  </div>
+  <div class="nav-group">
+    <div class="nav-group-title">Deliverables</div>
+    <a href="#slides">Slide Deck Outline</a>
+    <a href="#next-actions">Next Actions</a>
+  </div>
+</nav>
+
+<!-- MAIN CONTENT -->
+<main>
+
+<!-- ========== HERO ========== -->
+<div class="hero" id="hero">
+  <h1>Beacon 1.0</h1>
+  <div class="subtitle">One truth spine, many views. No parallel reporting systems.</div>
+  <div class="stats">
+    <div class="stat"><div class="num">3</div><div class="label">Personas</div></div>
+    <div class="stat"><div class="num">50</div><div class="label">Target Initiatives</div></div>
+    <div class="stat"><div class="num">8</div><div class="label">Key Decisions</div></div>
+    <div class="stat"><div class="num">8</div><div class="label">Sprints to MVP</div></div>
+    <div class="stat"><div class="num">15</div><div class="label">Slides Ready</div></div>
+  </div>
+</div>
+
+<!-- ========== NORTH STAR ========== -->
+<section id="north-star">
+  <h2>North Star Outcome</h2>
+  <p>People across the org can reliably answer — in minutes, not meetings:</p>
+  <div class="card-grid-3">
+    <div class="card"><h3>What exists?</h3><p>Full inventory of innovation & digital initiatives, searchable and current.</p></div>
+    <div class="card"><h3>Who owns it?</h3><p>Clear ownership (roles + people), contactable, accountable.</p></div>
+    <div class="card"><h3>What's the status?</h3><p>Stage, health, truth state — live, not last quarter's slide deck.</p></div>
+    <div class="card"><h3>What's the investment?</h3><p>Budget bands, source splits, FTE allocation — visible at theme level.</p></div>
+    <div class="card"><h3>What affects my team?</h3><p>Function-filtered views: what I own, what impacts me, what I fund.</p></div>
+    <div class="card"><h3>What's at risk?</h3><p>Reds, ambers, stale items, blocked dependencies — with mitigations.</p></div>
+  </div>
+  <div class="callout"><strong>Product Mantra</strong>One truth spine, many views. Dashboards and Q&A are just lenses over the same underlying "Project Card" truth.</div>
+  <div class="callout warn"><strong>Anti-Positioning: What Beacon is NOT</strong>
+    Not a project management tool (no Gantt, no task boards). Not a replacement for Jira/ADO/Confluence. Not a decision-making system — it surfaces truth so humans decide faster. Not an AI that guesses — it's a librarian that cites sources.</div>
+</section>
+
+<!-- ========== PERSONAS ========== -->
+<section id="personas">
+  <h2>Personas & Jobs-to-Be-Done</h2>
+  <div class="card-grid-3">
+    <div class="card" style="border-top: 4px solid var(--accent);">
+      <h3>A) Innovators</h3>
+      <p style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">Day-to-day builders</p>
+      <p><strong>Jobs:</strong></p>
+      <ul>
+        <li>Discover what exists, avoid duplication</li>
+        <li>Reuse assets, find owners/SMEs</li>
+        <li>Publish/update initiatives with minimal friction</li>
+      </ul>
+      <p style="margin-top:12px;"><strong>Minimum Outputs:</strong></p>
+      <ul>
+        <li>Search-first homepage + filters</li>
+        <li>Initiative cards + "related initiatives"</li>
+        <li>"What changed" feed</li>
+        <li>Dialogue/Q&A grounded in cards</li>
+        <li>Submit/update flow + duplicate detection</li>
+      </ul>
+      <p style="margin-top:12px;"><strong>Success Signal:</strong></p>
+      <p>"Beacon check" becomes default before new PoCs start; reuse goes up.</p>
+    </div>
+    <div class="card" style="border-top: 4px solid var(--amber);">
+      <h3>B) Team Leads / Middle Mgmt</h3>
+      <p style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">Operational oversight</p>
+      <p><strong>Jobs:</strong></p>
+      <ul>
+        <li>Know what affects my area</li>
+        <li>Track progress; understand risks/mitigations</li>
+        <li>Allocation overview</li>
+      </ul>
+      <p style="margin-top:12px;"><strong>Minimum Outputs:</strong></p>
+      <ul>
+        <li>"My Area" view: owned + impacting initiatives</li>
+        <li>Health board: on track / at risk / blocked</li>
+        <li>Risk & mitigation register</li>
+        <li>Resourcing bands + allocation summary</li>
+      </ul>
+      <p style="margin-top:12px;"><strong>Success Signal:</strong></p>
+      <p>Prep time for ops reviews drops; fewer "status ping" messages.</p>
+    </div>
+    <div class="card" style="border-top: 4px solid var(--purple);">
+      <h3>C) High Management / LT</h3>
+      <p style="font-size:12px; color:var(--text-secondary); margin-bottom:12px;">Strategic oversight</p>
+      <p><strong>Jobs:</strong></p>
+      <ul>
+        <li>Understand strategy + investment distribution</li>
+        <li>Track progression + expected value</li>
+        <li>Intervene where needed</li>
+      </ul>
+      <p style="margin-top:12px;"><strong>Minimum Outputs:</strong></p>
+      <ul>
+        <li>Leadership cockpit v1</li>
+        <li>Stage + investment distribution</li>
+        <li>Budget source split (DDIT vs functional)</li>
+        <li>Top "at risk / stalled" list</li>
+        <li>Pre-digested brief tiles + drill-down</li>
+      </ul>
+      <p style="margin-top:12px;"><strong>Success Signal:</strong></p>
+      <p>Leaders use Beacon before portfolio/steering sessions.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ========== POSITIONING ========== -->
+<section id="positioning">
+  <h2>I. Positioning & Narrative</h2>
+  <h3>What Beacon Replaces</h3>
+  <table>
+    <thead><tr><th>What Dies</th><th>What Replaces It</th></tr></thead>
+    <tbody>
+      <tr><td>Status-update meetings just to find out "what exists"</td><td>Search + card browse</td></tr>
+      <tr><td>Spreadsheet trackers per function</td><td>Project Card single source</td></tr>
+      <tr><td>Slide decks with stale portfolio views</td><td>Leadership cockpit (live)</td></tr>
+      <tr><td>Email chains asking "who owns X?"</td><td>Owner field + Q&A engine</td></tr>
+      <tr><td>Duplicate PoCs nobody knew about</td><td>Duplicate detection + "related initiatives"</td></tr>
+    </tbody>
+  </table>
+  <div class="callout success">
+    <strong>Elevator Pitch (for internal sell)</strong>
+    "Beacon is the single inventory of everything we're building or exploring in innovation and digital. One truth spine, many views. No parallel reporting."
+  </div>
+</section>
+
+<!-- ========== DECISIONS ========== -->
+<section id="decisions">
+  <h2>8 Critical Decisions to Lock</h2>
+  <p style="margin-bottom:16px;">These gate everything. Lock them in the Wednesday session or the week after.</p>
+
+  <details open>
+    <summary>D1: Platform Base</summary>
+    <div class="detail-body">
+      <table>
+        <thead><tr><th>Option</th><th>Description</th><th></th></tr></thead>
+        <tbody>
+          <tr><td>A) SharePoint + Power Platform + Azure OpenAI</td><td>Corporate-approved, fast deploy, Power BI for dashboards</td><td><span class="badge badge-rec">Recommended if licensed</span></td></tr>
+          <tr><td>B) Custom web app</td><td>Full UX control, best Q&A experience, needs dev resources</td><td></td></tr>
+          <tr><td>C) Confluence-native + plugin</td><td>Already adopted, but terrible for structured data</td><td></td></tr>
+          <tr><td>D) Low-code (Retool/Appsmith) + DB + LLM</td><td>Fast iteration, real database, decent UX</td><td><span class="badge badge-rec">Recommended if can approve</span></td></tr>
+        </tbody>
+      </table>
+      <p><strong>Why it matters:</strong> Determines build speed, maintenance burden, and approval timeline.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>D2: Owner Identity — Name vs. Role</summary>
+    <div class="detail-body">
+      <table>
+        <thead><tr><th>Option</th><th>Tradeoff</th><th></th></tr></thead>
+        <tbody>
+          <tr><td>Names visible to all</td><td>Maximum accountability, may cause resistance</td><td></td></tr>
+          <tr><td>Roles only</td><td>Safe but no one can contact the owner</td><td></td></tr>
+          <tr><td>Names visible to authenticated users only</td><td>Balanced — accountable but not publicly exposed</td><td><span class="badge badge-rec">Recommended</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+
+  <details>
+    <summary>D3: Q&A Engine Hosting</summary>
+    <div class="detail-body">
+      <table>
+        <thead><tr><th>Option</th><th>Consideration</th><th></th></tr></thead>
+        <tbody>
+          <tr><td>Azure OpenAI (corporate tenant)</td><td>Best if tenant exists; data stays in corporate boundary</td><td><span class="badge badge-rec">Recommended if available</span></td></tr>
+          <tr><td>On-prem LLM</td><td>Max privacy, high infra cost, limited capability</td><td></td></tr>
+          <tr><td>No LLM for v0.1 (structured search only)</td><td>Lowest risk; add LLM in v1.0 once trust established</td><td><span class="badge badge-rec">Safe fallback</span></td></tr>
+        </tbody>
+      </table>
+      <p><strong>Why it matters:</strong> Compliance and data residency in pharma are non-negotiable.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>D4: Scope of v0.1 Seed Set</summary>
+    <div class="detail-body">
+      <table>
+        <thead><tr><th>Option</th><th></th></tr></thead>
+        <tbody>
+          <tr><td>Your own innovation portfolio only (15-20 you know cold)</td><td><span class="badge badge-rec">Recommended</span></td></tr>
+          <tr><td>Cross-functional sample</td><td>Broader coverage but harder to guarantee quality</td></tr>
+          <tr><td>Single domain deep dive</td><td>Deep but narrow — doesn't prove cross-org value</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+
+  <details>
+    <summary>D5: Budget Data Granularity</summary>
+    <div class="detail-body">
+      <table>
+        <thead><tr><th>Option</th><th></th></tr></thead>
+        <tbody>
+          <tr><td>Bands only (0-50k / 50-250k / 250k+)</td><td><span class="badge badge-rec">Recommended for v1.0</span></td></tr>
+          <tr><td>Actual figures from finance</td><td>Requires system integration + data governance</td></tr>
+          <tr><td>Hybrid (bands now, actuals in v2.0)</td><td>Pragmatic path</td></tr>
+        </tbody>
+      </table>
+      <p><strong>Why bands first:</strong> Reduces political friction. Actuals require finance integration + approvals.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>D6: Taxonomy Governance</summary>
+    <div class="detail-body">
+      <table>
+        <thead><tr><th>Option</th><th></th></tr></thead>
+        <tbody>
+          <tr><td>Central team owns all taxonomy</td><td>Consistent but bottleneck</td></tr>
+          <tr><td>Federated (curators propose, central approves)</td><td><span class="badge badge-rec">Recommended</span></td></tr>
+          <tr><td>Open tagging (anyone adds anything)</td><td>Chaos within weeks</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+
+  <details>
+    <summary>D7: Evidence Storage</summary>
+    <div class="detail-body">
+      <table>
+        <thead><tr><th>Option</th><th></th></tr></thead>
+        <tbody>
+          <tr><td>Links only (Confluence/SharePoint URLs)</td><td><span class="badge badge-rec">Recommended for v1.0</span></td></tr>
+          <tr><td>Beacon stores copies</td><td>Becomes a document management system — avoid</td></tr>
+          <tr><td>Hybrid</td><td>Complexity without clear benefit yet</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+
+  <details>
+    <summary>D8: Staleness Enforcement</summary>
+    <div class="detail-body">
+      <table>
+        <thead><tr><th>Option</th><th></th></tr></thead>
+        <tbody>
+          <tr><td>Soft flag only</td><td>Visible but no consequence — staleness will persist</td></tr>
+          <tr><td>Soft flag + auto-downgrade from leadership-visible after 90 days</td><td><span class="badge badge-rec">Recommended</span></td></tr>
+          <tr><td>Hard block (card hidden until updated)</td><td>Too aggressive — destroys data visibility</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+</section>
+
+<!-- ========== STAKEHOLDERS ========== -->
+<section id="stakeholders">
+  <h2>Stakeholder Map & Buy-In Sequence</h2>
+
+  <h3>Tier 1 — Must Have Before v0.1</h3>
+  <table>
+    <thead><tr><th>Stakeholder</th><th>What They Need to Believe</th><th>How to Get Them</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Direct manager / sponsor</strong></td><td>Beacon is the vehicle for showing innovation portfolio value</td><td>1:1 with one-pager + cockpit sketch</td></tr>
+      <tr><td><strong>IT / Digital platform owner</strong></td><td>This fits the tech stack, doesn't create shadow IT</td><td>Joint architecture review; use their preferred stack</td></tr>
+      <tr><td><strong>1 Leadership champion (e.g., Iman)</strong></td><td>"I'd use this before every steering meeting"</td><td>Show mockup of leadership cockpit with their function's data</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Tier 2 — Must Have Before v1.0 Pilot</h3>
+  <table>
+    <thead><tr><th>Stakeholder</th><th>What They Need to Believe</th><th>How to Get Them</th></tr></thead>
+    <tbody>
+      <tr><td><strong>John</strong> (when he returns)</td><td>Beacon complements, not competes with his work</td><td>Map his work into Beacon schema; show it amplifies his visibility</td></tr>
+      <tr><td><strong>Luisa</strong></td><td>Her function/domain benefits from visibility</td><td>Show "My Area" view with initiatives affecting her team</td></tr>
+      <tr><td><strong>2-3 innovation team leads</strong></td><td>Less reporting burden, not more</td><td>Demo submit flow (&lt;30 min onboarding promise)</td></tr>
+      <tr><td><strong>Content steward candidate</strong></td><td>Real role with impact, not admin busywork</td><td>Frame as "portfolio intelligence lead"</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Buy-In Timeline</h3>
+  <div class="timeline">
+    <div class="timeline-item"><h4>Week 0-1</h4><p>Sponsor + IT alignment (lock decisions D1-D3)</p></div>
+    <div class="timeline-item"><h4>Week 2</h4><p>Leadership champion recruited (Iman or equivalent)</p></div>
+    <div class="timeline-item"><h4>Week 3-4</h4><p>v0.1 built, seeded with 15-20 initiatives</p></div>
+    <div class="timeline-item"><h4>Week 5</h4><p>Demo to Tier 1 + John/Luisa preview</p></div>
+    <div class="timeline-item"><h4>Week 6+</h4><p>Pilot team recruitment for v1.0</p></div>
+  </div>
+</section>
+
+<!-- ========== PLATFORM OPTIONS ========== -->
+<section id="platform">
+  <h2>II. Platform Architecture Options</h2>
+
+  <details open>
+    <summary>Option A: SharePoint + Power Platform + Azure OpenAI</summary>
+    <div class="detail-body">
+      <div class="flow"><strong>[SharePoint List]</strong>          --> Project Card storage (structured)
+<strong>[PowerApps]</strong>                --> Submit/update forms + card views
+<strong>[Power BI]</strong>                 --> Dashboards (all 3 persona views)
+<strong>[Power Automate]</strong>           --> Staleness checks, notifications, gates
+<strong>[Azure OpenAI + AI Search]</strong> --> Q&A engine (RAG over card data + linked docs)
+<strong>[SharePoint Pages]</strong>         --> Landing pages per persona</div>
+      <p><span class="badge badge-green">Pros:</span> Corporate-approved stack, fast deploy, SSO built-in, Power BI already used by leadership.</p>
+      <p><span class="badge badge-red">Cons:</span> PowerApps UX is mediocre, customization ceiling, Power BI refresh latency.</p>
+      <p><strong>Time to v0.1:</strong> 3-4 weeks if Power Platform licenses exist.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>Option B: Custom Web App</summary>
+    <div class="detail-body">
+      <div class="flow"><strong>[Next.js / React frontend]</strong>  --> All persona views + Q&A interface
+<strong>[PostgreSQL / Cosmos DB]</strong>     --> Project Card storage
+<strong>[Azure OpenAI + embeddings]</strong>  --> Q&A engine
+<strong>[Azure App Service]</strong>          --> Hosting
+<strong>[Azure AD]</strong>                   --> Auth</div>
+      <p><span class="badge badge-green">Pros:</span> Full UX control, best Q&A experience, scales well.</p>
+      <p><span class="badge badge-red">Cons:</span> Needs developer resources, longer approval cycle, maintenance burden.</p>
+      <p><strong>Time to v0.1:</strong> 5-6 weeks with a developer.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>Option C: Confluence-Native</summary>
+    <div class="detail-body">
+      <div class="flow"><strong>[Confluence pages]</strong>           --> Project Cards as structured pages
+<strong>[Confluence macros + labels]</strong> --> Filtering, views
+<strong>[Confluence analytics]</strong>       --> Basic usage tracking
+<strong>[External Q&A layer]</strong>         --> Separate RAG service over Confluence API</div>
+      <p><span class="badge badge-green">Pros:</span> Already adopted, zero new tooling.</p>
+      <p><span class="badge badge-red">Cons:</span> Terrible for structured data, no real dashboard capability, Q&A requires separate service.</p>
+      <p><strong>Time to v0.1:</strong> 2 weeks for cards, but dashboards and Q&A add months.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>Option D: Low-Code + Database <span class="badge badge-rec">Recommended if approvable</span></summary>
+    <div class="detail-body">
+      <div class="flow"><strong>[Retool / Appsmith / Budibase]</strong> --> Forms, views, dashboards
+<strong>[PostgreSQL on Azure]</strong>           --> Project Card storage
+<strong>[Azure OpenAI]</strong>                  --> Q&A engine (when ready)
+<strong>[Azure AD / SSO]</strong>                --> Auth</div>
+      <p><span class="badge badge-green">Pros:</span> Fast iteration, real database underneath, decent UX, easy to add Q&A later.</p>
+      <p><span class="badge badge-red">Cons:</span> Another tool to approve, potential licensing cost.</p>
+      <p><strong>Time to v0.1:</strong> 3-4 weeks.</p>
+    </div>
+  </details>
+
+  <div class="callout"><strong>Recommendation</strong> Start with Option A if you already have Power Platform and want zero friction on approval. Start with Option D if you want better UX and can get a low-code tool approved. Only go Option B if you have dedicated dev resources.</div>
+</section>
+
+<!-- ========== Q&A ENGINE ========== -->
+<section id="qa-engine">
+  <h2>Q&A Engine Design (RAG Architecture)</h2>
+  <p>The differentiator. A responsible librarian, not an overconfident oracle.</p>
+
+  <h3>Architecture Flow</h3>
+  <div class="flow"><strong>User Question</strong>
+    |
+    v
+<strong>[Query Understanding Layer]</strong>
+    - Classify intent (summarize / compare / list / status / owner / risk)
+    - Extract entities (initiative name, function, stream, stage)
+    |
+    v
+<strong>[Retrieval Layer]</strong>
+    - Structured search: SQL/filter over Project Card fields
+    - Semantic search: embeddings over card text + evidence summaries
+    - Hybrid ranking: structured matches first, semantic fill
+    |
+    v
+<strong>[Grounding Layer]</strong>
+    - Every claim must map to a card field or evidence link
+    - If no match: "Not available in Beacon yet" + missing field + likely owner
+    |
+    v
+<strong>[Response Generation]</strong>
+    - LLM generates answer with inline citations [Card: X, Field: Y]
+    - Guardrails enforce disallowed answer types
+    - Confidence flag: "grounded" / "partial" / "not available"
+    |
+    v
+<strong>[User sees answer + source links]</strong></div>
+
+  <h3>Grounding Rules (System Prompt)</h3>
+  <div class="code-block">GROUNDING RULES:
+1. You are a Beacon librarian. Answer ONLY from retrieved Project Card data
+   and linked evidence documents.
+2. ALWAYS cite the source: [Card: {beacon_id}, Field: {field_name}] or
+   [Evidence: {link_title}].
+3. If the answer is not in the data, say: "This information is not yet
+   available in Beacon. The [{missing_field}] field on [{initiative_name}]
+   would need to be filled in by [{owner_role}]."
+4. NEVER:
+   - Guess budget numbers beyond stated bands
+   - Infer ownership if not stated
+   - Claim strategy direction unless Truth State is Committed or Delivering
+5. For comparison questions: only compare on structured fields. Flag where
+   data is missing for one side.</div>
+
+  <h3>Allowed vs. Disallowed Answers (v1.0)</h3>
+  <table>
+    <thead><tr><th>Allowed</th><th>Disallowed</th></tr></thead>
+    <tbody>
+      <tr><td>Summarize an initiative</td><td>Guess budget numbers beyond bands</td></tr>
+      <tr><td>Compare initiatives (structured fields)</td><td>Infer ownership if not stated</td></tr>
+      <tr><td>List initiatives by filter</td><td>Claim "strategy direction" unless Committed/Delivering</td></tr>
+      <tr><td>Provide status / health / budget band</td><td>Make predictions about outcomes</td></tr>
+      <tr><td>Identify owners/roles + evidence links</td><td>Synthesize across cards without explicit data</td></tr>
+      <tr><td>Surface risks and mitigations</td><td>Recommend actions or priorities</td></tr>
+    </tbody>
+  </table>
+
+  <h3>10 Standard Validation Questions</h3>
+  <table>
+    <thead><tr><th>#</th><th>Question</th><th>Expected Source</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>"What initiatives exist in [stream X]?"</td><td>Filter by stream tag</td></tr>
+      <tr><td>2</td><td>"Who owns [initiative Y]?"</td><td>Owner role/person field</td></tr>
+      <tr><td>3</td><td>"What's the status of [initiative Y]?"</td><td>Stage + Truth State + Health</td></tr>
+      <tr><td>4</td><td>"What's at risk right now?"</td><td>Health = Red/Amber filter</td></tr>
+      <tr><td>5</td><td>"How much are we investing in [theme]?"</td><td>Budget band aggregation</td></tr>
+      <tr><td>6</td><td>"What affects [function Z]?"</td><td>Function/domain filter</td></tr>
+      <tr><td>7</td><td>"Are there any initiatives similar to [description]?"</td><td>Semantic search + tags</td></tr>
+      <tr><td>8</td><td>"What evidence exists for [initiative Y]?"</td><td>Evidence links field</td></tr>
+      <tr><td>9</td><td>"What changed this month?"</td><td>Last updated filter (30 days)</td></tr>
+      <tr><td>10</td><td>"What's stale?"</td><td>Last updated > 90 days</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ========== DATA MODEL ========== -->
+<section id="data-model">
+  <h2>Data Model — Project Card Schema</h2>
+  <p>The Beacon Project Card: easy to maintain, strong enough to power both Q&A and dashboards.</p>
+
+  <h3>Core Tables</h3>
+  <details open>
+    <summary>initiatives (main table)</summary>
+    <div class="detail-body">
+      <table>
+        <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td>beacon_id</td><td>VARCHAR(20) PK</td><td>Immutable, e.g., "BCN-0042"</td></tr>
+          <tr><td>title</td><td>VARCHAR(200) NOT NULL</td><td></td></tr>
+          <tr><td>owner_role</td><td>VARCHAR(100) NOT NULL</td><td>Mandatory</td></tr>
+          <tr><td>owner_person</td><td>VARCHAR(100)</td><td>Nullable per D2 decision</td></tr>
+          <tr><td>function_domain</td><td>VARCHAR(100) NOT NULL</td><td>FK to domains vocab</td></tr>
+          <tr><td>stage</td><td>ENUM</td><td>Idea / PoC / Pilot / Scale / Retired</td></tr>
+          <tr><td>truth_state</td><td>ENUM</td><td>Exploring / Committed / Delivering / Completed / Retired</td></tr>
+          <tr><td>publication_tier</td><td>ENUM</td><td>Draft / Searchable / Leadership-Visible</td></tr>
+          <tr><td>problem_statement</td><td>TEXT NOT NULL</td><td>2-3 lines</td></tr>
+          <tr><td>scope_description</td><td>TEXT</td><td>What it is / isn't</td></tr>
+          <tr><td>target_users</td><td>TEXT</td><td></td></tr>
+          <tr><td>delivery_health</td><td>ENUM</td><td>Green / Amber / Red</td></tr>
+          <tr><td>health_reason</td><td>TEXT</td><td>Required if Amber/Red</td></tr>
+          <tr><td>budget_band</td><td>ENUM</td><td>0-50k / 50-250k / 250k+ / Unknown</td></tr>
+          <tr><td>budget_source</td><td>ENUM</td><td>DDIT / Function / Mixed / Vendor-funded / Unknown</td></tr>
+          <tr><td>spend_status</td><td>ENUM</td><td>Planned / Committed / Spent-to-date / Unknown</td></tr>
+          <tr><td>fte_band</td><td>ENUM</td><td>&lt;0.5 / 0.5-2 / 2-5 / 5+ / Unknown</td></tr>
+          <tr><td>update_cadence</td><td>ENUM</td><td>Monthly / Quarterly</td></tr>
+          <tr><td>last_updated</td><td>TIMESTAMP</td><td></td></tr>
+          <tr><td>created_at</td><td>TIMESTAMP</td><td></td></tr>
+          <tr><td>is_stale</td><td>BOOLEAN</td><td>Auto-set if last_updated > 90 days</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+
+  <details>
+    <summary>initiative_outcomes</summary>
+    <div class="detail-body">
+      <table>
+        <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td>id</td><td>SERIAL PK</td><td></td></tr>
+          <tr><td>beacon_id</td><td>FK</td><td></td></tr>
+          <tr><td>category</td><td>VARCHAR(100)</td><td>Compliance risk reduction, Cycle time reduction, Quality improvement, Cost reduction, Capability building, Inspection readiness</td></tr>
+          <tr><td>description</td><td>TEXT</td><td>1 sentence each</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+
+  <details>
+    <summary>initiative_evidence</summary>
+    <div class="detail-body">
+      <table>
+        <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td>id</td><td>SERIAL PK</td><td></td></tr>
+          <tr><td>beacon_id</td><td>FK</td><td></td></tr>
+          <tr><td>link_type</td><td>ENUM</td><td>One-pager / Deck / Demo / Confluence / Other</td></tr>
+          <tr><td>url</td><td>TEXT</td><td></td></tr>
+          <tr><td>title</td><td>VARCHAR(200)</td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+
+  <details>
+    <summary>initiative_milestones</summary>
+    <div class="detail-body">
+      <table>
+        <thead><tr><th>Field</th><th>Type</th></tr></thead>
+        <tbody>
+          <tr><td>id</td><td>SERIAL PK</td></tr>
+          <tr><td>beacon_id</td><td>FK</td></tr>
+          <tr><td>title</td><td>VARCHAR(200)</td></tr>
+          <tr><td>target_date</td><td>DATE</td></tr>
+          <tr><td>status</td><td>ENUM: Not started / In progress / Done / Missed</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+
+  <details>
+    <summary>initiative_risks</summary>
+    <div class="detail-body">
+      <table>
+        <thead><tr><th>Field</th><th>Type</th></tr></thead>
+        <tbody>
+          <tr><td>id</td><td>SERIAL PK</td></tr>
+          <tr><td>beacon_id</td><td>FK</td></tr>
+          <tr><td>description</td><td>TEXT</td></tr>
+          <tr><td>impact</td><td>ENUM: High / Medium / Low</td></tr>
+          <tr><td>mitigation_owner</td><td>VARCHAR(100)</td></tr>
+          <tr><td>mitigation_status</td><td>ENUM: Identified / In progress / Mitigated / Accepted</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+
+  <details>
+    <summary>Supporting tables (tags, dependencies, roles, data sources, decisions, controlled vocab)</summary>
+    <div class="detail-body">
+      <table>
+        <thead><tr><th>Table</th><th>Key Fields</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td>initiative_tags</td><td>beacon_id, tag</td><td>Stream/theme tags from controlled vocab</td></tr>
+          <tr><td>initiative_dependencies</td><td>from_id, to_id, type (Blocks/Blocked by/Related)</td><td>Cross-initiative links</td></tr>
+          <tr><td>initiative_key_roles</td><td>beacon_id, role_name, person_name</td><td>Architect, PO, validator, etc.</td></tr>
+          <tr><td>initiative_data_sources</td><td>beacon_id, source_name, source_type</td><td>Systems, datasets, APIs used</td></tr>
+          <tr><td>initiative_decisions</td><td>beacon_id, date, description, decided_by</td><td>Optional lightweight decision log</td></tr>
+          <tr><td>controlled_vocab</td><td>category, value, display_order, is_active</td><td>Central taxonomy management</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+
+  <h3>Controlled Vocabulary</h3>
+  <div class="card-grid">
+    <div class="card">
+      <h3>Stages</h3>
+      <p>Idea &rarr; PoC &rarr; Pilot &rarr; Scale &rarr; Retired</p>
+    </div>
+    <div class="card">
+      <h3>Truth State</h3>
+      <p>Exploring (question) &rarr; Committed (approved) &rarr; Delivering &rarr; Completed &rarr; Retired</p>
+    </div>
+    <div class="card">
+      <h3>Streams / Themes (8-12 max)</h3>
+      <ul style="font-size:13px;">
+        <li>Knowledge & retrieval</li>
+        <li>Data lineage & trust</li>
+        <li>AI-assisted drafting / triage</li>
+        <li>Workflow automation</li>
+        <li>Portfolio visibility & governance</li>
+        <li>Compliance/validation acceleration</li>
+        <li>Labeling / Ad Promo support</li>
+        <li>Safety signal / vigilance support</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>Publication Gates</h3>
+  <table>
+    <thead><tr><th>Tier</th><th>Visibility</th><th>Requirements</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><span class="badge badge-blue">Draft</span></td>
+        <td>Contributors only, not searchable</td>
+        <td>Identity + intent complete (owner role, title, domain, problem statement)</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-green">Searchable</span></td>
+        <td>Default for innovators</td>
+        <td>Evidence link minimum (1: one-pager OR deck OR demo), Stage + Truth State set, Update cadence set</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-purple">Leadership-Visible</span></td>
+        <td>Eligible for cockpit counts</td>
+        <td>Health status (G/A/R + reason), Budget band + source split, At least 1 milestone OR 1 risk entry</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-amber">Pilot/Scale Badge</span></td>
+        <td>Signals credibility</td>
+        <td>Clear outcomes statement, Data sources listed, Validation/compliance notes if relevant</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Staleness Logic</h3>
+  <div class="code-block">-- Runs daily or on-access:
+UPDATE initiatives
+SET is_stale = TRUE
+WHERE last_updated &lt; NOW() - INTERVAL '90 days'
+  AND stage NOT IN ('Retired', 'Completed');
+
+-- Application logic:
+-- If is_stale AND publication_tier = 'Leadership-Visible':
+--   exclude from cockpit green/amber totals
+--   show in "Attention Needed: Stale" section</div>
+</section>
+
+<!-- ========== PHASE 0.1 ========== -->
+<section id="phase01">
+  <h2>III. Phase 0.1 — Stabilize Truth Spine (Weeks 1-6)</h2>
+  <div class="callout"><strong>Goal:</strong> 15-20 curated initiatives loaded to standard. Q&A answers 10 standard questions. New initiative onboardable in &lt;30 min.</div>
+
+  <div class="roadmap-bar">
+    <div style="flex:0.5; background: #64748b;">Pre-W0</div>
+    <div style="flex:1; background: #3b82f6;">W1</div>
+    <div style="flex:1; background: #2563eb;">W2</div>
+    <div style="flex:1; background: #1d4ed8;">W3</div>
+    <div style="flex:1; background: #1e40af;">W4</div>
+    <div style="flex:1; background: #1e3a8a;">W5-6</div>
+  </div>
+
+  <details open>
+    <summary>Pre-Week 0: Wednesday Working Session</summary>
+    <div class="detail-body">
+      <table>
+        <thead><tr><th>Time</th><th>Topic</th><th>Output</th></tr></thead>
+        <tbody>
+          <tr><td>9:30-10:00</td><td>Lock Beacon 1.0 definition + personas + minimum outputs</td><td>Signed-off one-pager</td></tr>
+          <tr><td>10:00-10:45</td><td>Agree Project Card schema v0 + controlled vocab + Truth State</td><td>Schema spreadsheet</td></tr>
+          <tr><td>10:45-11:15</td><td>Agree gates (draft/searchable/leadership-visible) + staleness policy</td><td>Gate rules doc</td></tr>
+          <tr><td>11:15-11:45</td><td>Dashboard v1 sketches (innovator/team lead/leadership)</td><td>Wireframe sketches</td></tr>
+          <tr><td>11:45-12:00</td><td>Pilot scope + metric targets + next actions</td><td>Action list</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+
+  <details>
+    <summary>Week 1: Foundation</summary>
+    <div class="detail-body">
+      <table>
+        <thead><tr><th>Day</th><th>Action</th><th>Output</th></tr></thead>
+        <tbody>
+          <tr><td>Mon</td><td>Set up database/storage per D1 platform choice</td><td>Empty schema deployed</td></tr>
+          <tr><td>Mon</td><td>Create Beacon ID generation logic (BCN-0001 sequential)</td><td>ID generator</td></tr>
+          <tr><td>Tue</td><td>Build controlled vocabulary table + seed with agreed values</td><td>Vocab table populated</td></tr>
+          <tr><td>Tue</td><td>Create intake form (all must-have fields)</td><td>Working form</td></tr>
+          <tr><td>Wed</td><td>Build basic card detail view (read-only)</td><td>Card page</td></tr>
+          <tr><td>Thu</td><td>Build basic list view with filters (stage, domain, stream, health)</td><td>List page</td></tr>
+          <tr><td>Fri</td><td>Write "Card Population Guide" (1-page: what goes where, examples)</td><td>Guide doc</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+
+  <details>
+    <summary>Week 2: Seed Content</summary>
+    <div class="detail-body">
+      <table>
+        <thead><tr><th>Day</th><th>Action</th><th>Output</th></tr></thead>
+        <tbody>
+          <tr><td>Mon</td><td>You personally fill in 5 initiatives you know best</td><td>5 complete cards</td></tr>
+          <tr><td>Tue</td><td>Fill in 5 more + recruit 1-2 team members to fill 2-3 each</td><td>10-12 cards</td></tr>
+          <tr><td>Wed</td><td><strong>Card Jam session</strong> (90 min with 3-4 people): fill remaining cards</td><td>15-20 cards total</td></tr>
+          <tr><td>Thu</td><td>Quality review: check every card against publication gates</td><td>Cards categorized by tier</td></tr>
+          <tr><td>Fri</td><td>Apply publication tiers: 15+ searchable, 8-10 leadership-visible</td><td>Tiered inventory</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+
+  <details>
+    <summary>Week 3: Search & Gates</summary>
+    <div class="detail-body">
+      <table>
+        <thead><tr><th>Day</th><th>Action</th><th>Output</th></tr></thead>
+        <tbody>
+          <tr><td>Mon</td><td>Build search (text search over title, problem, scope, tags)</td><td>Working search</td></tr>
+          <tr><td>Tue</td><td>Implement publication gate validation (auto-check fields per tier)</td><td>Gate logic</td></tr>
+          <tr><td>Wed</td><td>Build staleness flagging (90-day rule + visual indicator)</td><td>Stale badges</td></tr>
+          <tr><td>Thu</td><td>Build duplicate detection (title similarity + tag overlap)</td><td>Duplicate prompts</td></tr>
+          <tr><td>Fri</td><td>Internal testing with 2-3 users</td><td>Feedback log</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+
+  <details>
+    <summary>Week 4: Q&A Engine</summary>
+    <div class="detail-body">
+      <table>
+        <thead><tr><th>Day</th><th>Action</th><th>Output</th></tr></thead>
+        <tbody>
+          <tr><td>Mon</td><td>Index all card data for retrieval (embeddings or full-text)</td><td>Search index</td></tr>
+          <tr><td>Tue</td><td>Implement grounding rules + citation format</td><td>Q&A system prompt</td></tr>
+          <tr><td>Wed</td><td>Test 10 standard questions, tune retrieval</td><td>Test results</td></tr>
+          <tr><td>Thu</td><td>Implement "not available" fallback with missing-field guidance</td><td>Graceful failures</td></tr>
+          <tr><td>Fri</td><td>Demo to Tier 1 stakeholders</td><td>Go/no-go for expansion</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+
+  <details>
+    <summary>Week 5-6: Polish & Exit Criteria</summary>
+    <div class="detail-body">
+      <table>
+        <thead><tr><th>Exit Criterion</th><th>Test</th><th>Pass?</th></tr></thead>
+        <tbody>
+          <tr><td>Onboard 1 new initiative with non-builder</td><td>&lt;30 minutes end-to-end</td><td></td></tr>
+          <tr><td>10 standard questions with fresh user</td><td>Grounded answers (or explicit "not available") for all 10</td><td></td></tr>
+          <tr><td>Staleness flags work</td><td>Stale items correctly flagged</td><td></td></tr>
+          <tr><td>Gate logic enforced</td><td>Draft/searchable/leadership-visible correctly applied</td><td></td></tr>
+          <tr><td>Stakeholder sign-off</td><td>Sponsor and champion say "continue"</td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+</section>
+
+<!-- ========== PHASE 1.0 ========== -->
+<section id="phase10">
+  <h2>Phase 1.0 — MVP for All 3 Personas (Sprints 1-8)</h2>
+  <div class="callout"><strong>Target:</strong> 50 initiatives, 80% searchable, 60% leadership-visible, &lt;20% stale. 2-week sprint cadence.</div>
+
+  <div class="roadmap-bar">
+    <div style="flex:2; background: #3b82f6;">S1-2: Innovators</div>
+    <div style="flex:2; background: #d97706;">S3-4: Team Leads</div>
+    <div style="flex:2; background: #7c3aed;">S5-6: Leadership</div>
+    <div style="flex:2; background: #16a34a;">S7-8: Pilot</div>
+  </div>
+
+  <details open>
+    <summary>Sprint 1-2: Innovator Experience <span class="badge badge-blue">25+ initiatives target</span></summary>
+    <div class="detail-body">
+      <table>
+        <thead><tr><th>Sprint</th><th>Deliverable</th><th>Details</th></tr></thead>
+        <tbody>
+          <tr><td>S1</td><td>Search-first homepage</td><td>Search bar prominent, filters sidebar (domain, stream, stage, tags), card tiles</td></tr>
+          <tr><td>S1</td><td>Card detail page (full)</td><td>All fields rendered, evidence clickable, related initiatives shown</td></tr>
+          <tr><td>S1</td><td>"What changed" feed</td><td>Chronological: new cards, stage changes, health changes, new evidence</td></tr>
+          <tr><td>S2</td><td>Submit/update flow</td><td>Multi-step form, save-as-draft, pre-populated defaults, validation</td></tr>
+          <tr><td>S2</td><td>Duplicate detection (soft gate)</td><td>"Similar initiatives found: [list]. Continue anyway?"</td></tr>
+          <tr><td>S2</td><td>Related initiatives engine</td><td>Tag + domain similarity scoring, shown on card detail</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+
+  <details>
+    <summary>Sprint 3-4: Team Lead Experience <span class="badge badge-amber">35+ initiatives target</span></summary>
+    <div class="detail-body">
+      <table>
+        <thead><tr><th>Sprint</th><th>Deliverable</th><th>Details</th></tr></thead>
+        <tbody>
+          <tr><td>S3</td><td>"My Area" view</td><td>Initiatives I own + initiatives impacting my function/domain</td></tr>
+          <tr><td>S3</td><td>Operational health board</td><td>Kanban: On Track (green) / At Risk (amber) / Blocked (red) + reason</td></tr>
+          <tr><td>S3</td><td>Risk & mitigation register</td><td>Per-initiative + aggregated view across "My Area"</td></tr>
+          <tr><td>S4</td><td>Resourcing summary</td><td>FTE bands aggregated by function, key roles listed</td></tr>
+          <tr><td>S4</td><td>Allocation overview</td><td>Initiatives per team, stage distribution</td></tr>
+          <tr><td>S4</td><td>Notification preferences</td><td>Email digest: weekly summary of changes in "My Area"</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+
+  <details>
+    <summary>Sprint 5-6: Leadership Cockpit <span class="badge badge-purple">45+ initiatives target</span></summary>
+    <div class="detail-body">
+      <table>
+        <thead><tr><th>Sprint</th><th>Deliverable</th><th>Details</th></tr></thead>
+        <tbody>
+          <tr><td>S5</td><td>Portfolio overview dashboard</td><td>Initiatives by stage (bar), by stream (treemap), health distribution (donut)</td></tr>
+          <tr><td>S5</td><td>Investment distribution view</td><td>Budget bands by theme (stacked bar), source split (pie), spend status</td></tr>
+          <tr><td>S5</td><td>"Attention Needed" panel</td><td>Stale, Reds + top Ambers with mitigation status, missing owner/evidence</td></tr>
+          <tr><td>S6</td><td>"My Function's Role" view</td><td>What we own / what impacts us / what we fund</td></tr>
+          <tr><td>S6</td><td>Pre-digested brief tiles</td><td>3-7 auto-generated takeaways from data</td></tr>
+          <tr><td>S6</td><td>Drill-down from any tile</td><td>Click any number to see underlying initiative cards</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+
+  <details>
+    <summary>Sprint 7-8: Polish, Pilot, Validate <span class="badge badge-green">50 initiatives target</span></summary>
+    <div class="detail-body">
+      <table>
+        <thead><tr><th>Sprint</th><th>Deliverable</th><th>Details</th></tr></thead>
+        <tbody>
+          <tr><td>S7</td><td>Q&A engine refinement</td><td>Tune retrieval, conversation history, citation format</td></tr>
+          <tr><td>S7</td><td>Formatted exports (v1)</td><td>"Export as PDF": portfolio brief, function brief, at-risk list</td></tr>
+          <tr><td>S7</td><td>User onboarding flow</td><td>First-time guide, tooltips, "Beacon check" prompt integration</td></tr>
+          <tr><td>S8</td><td>Pilot execution</td><td>Run with defined cohorts (see Metrics section)</td></tr>
+          <tr><td>S8</td><td>Metrics collection</td><td>Track adoption/trust/value metrics</td></tr>
+          <tr><td>S8</td><td>Pilot retrospective</td><td>Document learnings, prioritize v2.0 backlog</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+</section>
+
+<!-- ========== PHASE 2.0 ========== -->
+<section id="phase20">
+  <h2>Phase 2.0 Themes (Scale + Integrate + Automate)</h2>
+  <div class="card-grid">
+    <div class="card">
+      <h3>Finance Integration</h3>
+      <p>Move from bands to real figures where feasible. Connect to portfolio/finance sources.</p>
+    </div>
+    <div class="card">
+      <h3>Automated Ingestion</h3>
+      <p>Doc parsing, metadata suggestion. AI pre-populates draft cards from Confluence pages and decks.</p>
+    </div>
+    <div class="card">
+      <h3>Dependency Graph v1</h3>
+      <p>Visual dependency mapping beyond tags. "What blocks what" view.</p>
+    </div>
+    <div class="card">
+      <h3>Proactive Push Outputs</h3>
+      <p>Monthly briefs, alerts, formatted "Beacon Products" auto-generated and distributed.</p>
+    </div>
+    <div class="card">
+      <h3>Extended User Base</h3>
+      <p>Broader scope beyond initial functions. Onboard remaining org units.</p>
+    </div>
+    <div class="card">
+      <h3>Exit Criterion</h3>
+      <p>Beacon becomes the default portfolio reference in steering routines.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ========== CONTENT SEEDING ========== -->
+<section id="seeding">
+  <h2>IV. Content Seeding Strategy</h2>
+  <div class="callout warn"><strong>Technology is 30% of the effort. Getting 50 initiatives consistently populated is 70%.</strong></div>
+
+  <h3>Three-Wave Seeding Playbook</h3>
+  <table>
+    <thead><tr><th>Wave</th><th>When</th><th>Source</th><th>Method</th><th>Volume</th><th>Quality</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><span class="badge badge-blue">Wave 1</span></td>
+        <td>v0.1 (you do it)</td>
+        <td>Your own innovation portfolio</td>
+        <td>You fill them in personally from memory + existing decks</td>
+        <td>15-20</td>
+        <td>High (you know the details)</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-amber">Wave 2</span></td>
+        <td>Sprint 1-2</td>
+        <td>Your direct team + closest collaborators</td>
+        <td>2x "Card Jam" workshops (90 min each, 5-8 people)</td>
+        <td>10-15</td>
+        <td>Medium (you review all)</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-green">Wave 3</span></td>
+        <td>Sprint 3-6</td>
+        <td>Cross-functional (team leads recruited during pilot)</td>
+        <td>Self-service + content steward review + weekly office hours</td>
+        <td>15-20</td>
+        <td>Variable (steward reviews)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Card Jam Workshop Format</h3>
+  <div class="card">
+    <h3>90-Minute Card Jam</h3>
+    <ul>
+      <li><strong>Pre-work (48h before):</strong> Send Card Population Guide + 3 example cards</li>
+      <li><strong>Format:</strong> Screen share the form, one person drives, others dictate</li>
+      <li><strong>Output:</strong> 5-8 cards per session at "searchable" quality</li>
+      <li><strong>Post-work:</strong> Product Owner reviews all cards before tier assignment</li>
+    </ul>
+  </div>
+
+  <h3>AI-Assisted Pre-Population (Accelerator)</h3>
+  <div class="card">
+    <p>If existing Confluence pages or slide decks exist for initiatives:</p>
+    <ol>
+      <li>Feed them to LLM with the Card schema as target format</li>
+      <li>Generate draft cards auto-populated from documents</li>
+      <li>Initiative owner reviews and corrects (30 min instead of 60 min)</li>
+      <li>This can cut onboarding time by 50%</li>
+    </ol>
+  </div>
+</section>
+
+<!-- ========== CHANGE MANAGEMENT ========== -->
+<section id="change-mgmt">
+  <h2>Change Management Playbook</h2>
+
+  <h3>Installing the "Beacon Check" Habit</h3>
+  <table>
+    <thead><tr><th>#</th><th>Mechanism</th><th>Details</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>Intake form gate</td><td>Add "Did you search Beacon? Y/N. What did you find?" to new initiative requests</td></tr>
+      <tr><td>2</td><td>Governance gate</td><td>"Has the proposer confirmed no duplicates exist in Beacon?" before approval</td></tr>
+      <tr><td>3</td><td>Gentle redirect</td><td>When someone starts a PoC without checking: "I see something similar in Beacon. Have you talked to [owner]?"</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Meeting Integration (Replace, Don't Add)</h3>
+  <table>
+    <thead><tr><th>Existing Meeting</th><th>Beacon Integration</th></tr></thead>
+    <tbody>
+      <tr><td>Portfolio / steering review</td><td>Open leadership cockpit as starting artifact. No more slide decks.</td></tr>
+      <tr><td>Innovation team standup</td><td>Quick scan of "what changed" + "at risk"</td></tr>
+      <tr><td>Function review with management</td><td>Open "My Function's Role" view</td></tr>
+      <tr><td>New PoC proposal</td><td>Beacon duplicate check + related initiatives</td></tr>
+      <tr><td>Quarterly business review</td><td>Export "Portfolio Brief" formatted output</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Quick Wins to Deploy in v0.1</h3>
+  <div class="card-grid-3">
+    <div class="card" style="border-left: 4px solid var(--green);">
+      <h3>The "30-Second Answer"</h3>
+      <p>Pick a question that currently requires a meeting. Answer it live from Beacon in front of a leader. Repeat.</p>
+    </div>
+    <div class="card" style="border-left: 4px solid var(--accent);">
+      <h3>The "I Didn't Know That Existed"</h3>
+      <p>When someone proposes something similar to existing work, show them the Beacon card. Reuse conversation starts naturally.</p>
+    </div>
+    <div class="card" style="border-left: 4px solid var(--amber);">
+      <h3>The "Stale Shame" List</h3>
+      <p>Publish stale initiatives monthly. Social pressure works. Nobody wants their initiative on the naughty list.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ========== OPERATING MODEL ========== -->
+<section id="operating-model">
+  <h2>V. Operating Model</h2>
+
+  <h3>Roles & Time Commitment</h3>
+  <table>
+    <thead><tr><th>Role</th><th>Who</th><th>Time (Build Phase)</th><th>Time (Steady State)</th><th>Key Activities</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Product Owner</strong></td><td>Nuno</td><td>4-6 hrs/week</td><td>2-3 hrs/week</td><td>Roadmap, prioritization, stakeholder alignment, demo</td></tr>
+      <tr><td><strong>Content Steward</strong></td><td>Dedicated person (20%+)</td><td>4-8 hrs/week</td><td>4-8 hrs/week</td><td>Taxonomy, quality gates, staleness chasing, onboarding</td></tr>
+      <tr><td><strong>Domain Curators</strong></td><td>1 per function (5-8 people)</td><td>1-2 hrs/week</td><td>1-2 hrs/week</td><td>Review cards in their domain, approve leadership-visible</td></tr>
+      <tr><td><strong>Initiative Owners</strong></td><td>50+ people eventually</td><td>30-60 min setup</td><td>30-60 min/quarter</td><td>Maintain their own cards, update health/status</td></tr>
+      <tr><td><strong>Tech Owner</strong></td><td>IT/platform person</td><td>4-8 hrs/week</td><td>2-4 hrs/week</td><td>Platform reliability, access control, integrations</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Operating Cadences</h3>
+  <div class="card-grid-3">
+    <div class="card" style="border-top: 3px solid var(--accent);">
+      <h3>Weekly</h3>
+      <p><em>Content Steward leads</em></p>
+      <ul>
+        <li>Triage new submissions</li>
+        <li>Review stale flags, nudge owners</li>
+        <li>Check Q&A failure log</li>
+      </ul>
+    </div>
+    <div class="card" style="border-top: 3px solid var(--amber);">
+      <h3>Monthly</h3>
+      <p><em>Product Owner leads</em></p>
+      <ul>
+        <li>Leadership cockpit hygiene review</li>
+        <li>Content quality audit (sample 5 cards)</li>
+        <li>Metrics review</li>
+      </ul>
+    </div>
+    <div class="card" style="border-top: 3px solid var(--purple);">
+      <h3>Quarterly</h3>
+      <p><em>PO + Steward + Curators</em></p>
+      <ul>
+        <li>Taxonomy cleanup</li>
+        <li>Retirement review</li>
+        <li>Schema evolution assessment</li>
+        <li>Roadmap update</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ========== METRICS ========== -->
+<section id="metrics">
+  <h2>Metrics & Pilot Design</h2>
+
+  <h3>Pilot Cohorts</h3>
+  <table>
+    <thead><tr><th>Cohort</th><th>Size</th><th>Duration</th><th>What They Test</th></tr></thead>
+    <tbody>
+      <tr><td>Innovator Team A</td><td>8-10</td><td>6 weeks</td><td>Search, discover, submit, update, Q&A</td></tr>
+      <tr><td>Innovator Team B</td><td>8-10</td><td>6 weeks</td><td>Same (different domain for comparison)</td></tr>
+      <tr><td>Team Lead cohort</td><td>4-6</td><td>6 weeks</td><td>My Area view, health board, risk register</td></tr>
+      <tr><td>Leadership cohort</td><td>3-4</td><td>4 weeks (start 2 weeks after others)</td><td>Cockpit, investment view, formatted outputs</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Metrics Dashboard</h3>
+  <table>
+    <thead><tr><th>Category</th><th>Metric</th><th>Target (v1.0)</th><th>How Measured</th></tr></thead>
+    <tbody>
+      <tr><td rowspan="3" style="font-weight:600; background:#dbeafe;">Adoption</td><td>Weekly active users (total)</td><td>30+</td><td>Login + action count</td></tr>
+      <tr><td>WAU by persona (innovator/TL/LT)</td><td>15 / 10 / 5</td><td>Role-based tracking</td></tr>
+      <tr><td>% initiatives viewed vs searched</td><td>&gt;50%</td><td>View/search ratio</td></tr>
+      <tr><td rowspan="3" style="font-weight:600; background:#dcfce7;">Trust</td><td>% Q&A answers with citations</td><td>&gt;90%</td><td>Automated logging</td></tr>
+      <tr><td>% leadership-visible with health + budget</td><td>&gt;80%</td><td>Field completeness audit</td></tr>
+      <tr><td>Staleness rate</td><td>&lt;20%</td><td>Automated calculation</td></tr>
+      <tr><td rowspan="3" style="font-weight:600; background:#fef3c7;">Value</td><td>Reuse referrals (view &rarr; contact click)</td><td>Track baseline</td><td>Click-through logging</td></tr>
+      <tr><td>Duplicate PoCs avoided</td><td>2+ in pilot</td><td>"Similar initiative" interceptions</td></tr>
+      <tr><td>Meeting prep time reduction</td><td>30%+ improvement</td><td>Survey (before/after)</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ========== RISKS ========== -->
+<section id="risks">
+  <h2>Risk Register</h2>
+  <table>
+    <thead><tr><th>#</th><th>Risk</th><th>Likelihood</th><th>Impact</th><th>Mitigation</th><th>Owner</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>R1</td>
+        <td><strong>Adoption stall:</strong> People don't maintain cards</td>
+        <td><span class="badge badge-red">High</span></td>
+        <td><span class="badge badge-red">Critical</span></td>
+        <td>Staleness enforcement + meeting integration + leadership "pull"</td>
+        <td>Product Owner</td>
+      </tr>
+      <tr>
+        <td>R2</td>
+        <td><strong>Garbage in:</strong> Cards filled with low-quality data</td>
+        <td><span class="badge badge-amber">Medium</span></td>
+        <td><span class="badge badge-red">High</span></td>
+        <td>Publication gates + content steward review + Card Jam workshops</td>
+        <td>Content Steward</td>
+      </tr>
+      <tr>
+        <td>R3</td>
+        <td><strong>Scope creep:</strong> Everyone wants custom fields</td>
+        <td><span class="badge badge-red">High</span></td>
+        <td><span class="badge badge-amber">Medium</span></td>
+        <td>Quarterly schema review only. "No" is default until 3+ stakeholders need it</td>
+        <td>Product Owner</td>
+      </tr>
+      <tr>
+        <td>R4</td>
+        <td><strong>Q&A trust erosion:</strong> LLM gives ungrounded answer, leader notices</td>
+        <td><span class="badge badge-amber">Medium</span></td>
+        <td><span class="badge badge-red">Critical</span></td>
+        <td>Strict grounding rules + "not available" fallback + citation on every claim + weekly Q&A log review</td>
+        <td>Tech Owner</td>
+      </tr>
+      <tr>
+        <td>R5</td>
+        <td><strong>Political resistance:</strong> Owners don't want transparency on health/budget</td>
+        <td><span class="badge badge-amber">Medium</span></td>
+        <td><span class="badge badge-red">High</span></td>
+        <td>Start with bands (not exact figures). Self-reported health. Frame as "getting help for reds"</td>
+        <td>Product Owner</td>
+      </tr>
+      <tr>
+        <td>R6</td>
+        <td><strong>No content steward:</strong> Role never gets staffed</td>
+        <td><span class="badge badge-amber">Medium</span></td>
+        <td><span class="badge badge-red">Critical</span></td>
+        <td>Named deliverable with explicit time allocation. If impossible, automate and accept slower quality ramp</td>
+        <td>PO + Manager</td>
+      </tr>
+      <tr>
+        <td>R7</td>
+        <td><strong>IT platform delays:</strong> Tooling approval takes months</td>
+        <td><span class="badge badge-amber">Medium</span></td>
+        <td><span class="badge badge-red">High</span></td>
+        <td>Start with whatever's approved (even spreadsheet + Confluence). Prove value first, migrate later</td>
+        <td>Product Owner</td>
+      </tr>
+      <tr>
+        <td>R8</td>
+        <td><strong>John misalignment:</strong> Returns and sees Beacon as competing</td>
+        <td><span class="badge badge-green">Low</span></td>
+        <td><span class="badge badge-red">High</span></td>
+        <td>Proactive framing: map his initiatives into Beacon before he returns. Show it amplifies his work</td>
+        <td>Product Owner</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ========== SLIDES ========== -->
+<section id="slides">
+  <h2>Slide Deck Outline (15 Slides)</h2>
+  <table>
+    <thead><tr><th>Slide</th><th>Title</th><th>Content</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>Beacon: One Truth Spine, Many Views</td><td>Problem statement (3 bullets). North star outcome.</td></tr>
+      <tr><td>2</td><td>What Beacon Replaces</td><td>2-column: "Today" vs "With Beacon"</td></tr>
+      <tr><td>3</td><td>Three Personas, Three Views</td><td>Innovators / Team Leads / Leadership with JTBD</td></tr>
+      <tr><td>4</td><td>The Project Card</td><td>Card mockup with key fields highlighted</td></tr>
+      <tr><td>5</td><td>Publication Gates</td><td>3-tier visual: Draft &rarr; Searchable &rarr; Leadership-Visible</td></tr>
+      <tr><td>6</td><td>Innovator View: Discovery Hub</td><td>Wireframe of search + filters + "what changed"</td></tr>
+      <tr><td>7</td><td>Team Lead View: My Area</td><td>Health board + risk register + allocation</td></tr>
+      <tr><td>8</td><td>Leadership Cockpit</td><td>Stage distribution, investment, attention-needed. <strong>Money slide.</strong></td></tr>
+      <tr><td>9</td><td>Q&A Engine</td><td>3-step flow: ask, retrieve from cards, answer with citations</td></tr>
+      <tr><td>10</td><td>Trust by Design</td><td>Staleness, grounding, "not available" fallback, evidence requirements</td></tr>
+      <tr><td>11</td><td>Roadmap</td><td>v0.1 &rarr; v1.0 &rarr; v2.0 with exit criteria</td></tr>
+      <tr><td>12</td><td>Pilot Plan</td><td>Cohorts, metrics, success criteria</td></tr>
+      <tr><td>13</td><td>Operating Model</td><td>Roles (RACI-lite), cadences, governance</td></tr>
+      <tr><td>14</td><td>What We Need</td><td>Content Steward, IT support, domain curators, leadership champion</td></tr>
+      <tr><td>15</td><td>Next Steps</td><td>Wednesday outcomes, immediate actions, first milestone</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ========== NEXT ACTIONS ========== -->
+<section id="next-actions">
+  <h2>Immediate Next Actions</h2>
+  <table>
+    <thead><tr><th>#</th><th>Action</th><th>When</th><th>Who</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>Post sections 2-5 of spec to Confluence as "Beacon 1.0 Spec"</td><td>Before Wednesday</td><td>You</td></tr>
+      <tr><td>2</td><td>Run Wednesday session using section 10 agenda. Lock D1-D8</td><td>Wednesday</td><td>You + team</td></tr>
+      <tr><td>3</td><td>Create "Card Population Guide" (1 page + 2 example cards)</td><td>Day after Wednesday</td><td>You</td></tr>
+      <tr><td>4</td><td>Set up database/platform per D1 decision</td><td>Week 1</td><td>You + IT</td></tr>
+      <tr><td>5</td><td>Fill your first 5 cards personally</td><td>Week 1</td><td>You</td></tr>
+      <tr><td>6</td><td>Recruit leadership champion (Iman?) -- show cockpit mockup</td><td>Week 1-2</td><td>You</td></tr>
+      <tr><td>7</td><td>Schedule first Card Jam workshop</td><td>Week 2</td><td>You</td></tr>
+      <tr><td>8</td><td>Brief John -- frame Beacon as amplifying his work</td><td>ASAP when available</td><td>You</td></tr>
+      <tr><td>9</td><td>Check Luisa availability for domain curator role</td><td>This week</td><td>You</td></tr>
+      <tr><td>10</td><td>Start building slide deck from outline above</td><td>Week 2-3</td><td>You</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<div style="text-align:center; padding:40px; color:var(--text-secondary); font-size:13px;">
+  Beacon 1.0 Execution Approach &mdash; Generated 2026-02-04 &mdash; Confidential
+</div>
+
+</main>
+
+<!-- EDIT TOOLBAR -->
+<div class="edit-toolbar" id="editToolbar">
+  <button id="editToggle" onclick="toggleEdit()">Edit Mode</button>
+  <div class="sep"></div>
+  <button id="exportBtn" onclick="exportData()" style="display:none;">Export HTML</button>
+  <button id="resetBtn" onclick="resetEdits()" style="display:none;">Reset</button>
+  <span class="edit-status" id="editStatus"></span>
+</div>
+<div class="saved-indicator" id="savedIndicator">Saved</div>
+
+<!-- SIDEBAR ACTIVE STATE + EDIT MODE -->
+<script>
+// --- Sidebar active tracking ---
+const links = document.querySelectorAll('nav.sidebar a');
+const sections = [];
+links.forEach(link => {
+  const id = link.getAttribute('href').slice(1);
+  const el = document.getElementById(id);
+  if (el) sections.push({ id, el, link });
+});
+function updateActive() {
+  let current = sections[0];
+  for (const s of sections) { if (s.el.getBoundingClientRect().top <= 120) current = s; }
+  links.forEach(l => l.classList.remove('active'));
+  if (current) current.link.classList.add('active');
+}
+window.addEventListener('scroll', updateActive);
+updateActive();
+
+// --- Edit Mode ---
+const STORAGE_KEY = 'beacon-dashboard-edits';
+let editMode = false;
+const mainEl = document.querySelector('main');
+const originalHTML = mainEl.innerHTML;
+
+// Restore saved edits on load
+(function restoreEdits() {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved) {
+    mainEl.innerHTML = saved;
+    document.getElementById('editStatus').textContent = 'Saved edits loaded';
+  }
+})();
+
+function toggleEdit() {
+  editMode = !editMode;
+  document.body.classList.toggle('edit-mode', editMode);
+  document.getElementById('editToggle').classList.toggle('active', editMode);
+  document.getElementById('exportBtn').style.display = editMode ? '' : 'none';
+  document.getElementById('resetBtn').style.display = editMode ? '' : 'none';
+  document.getElementById('editStatus').textContent = editMode ? 'Click any text to edit' : '';
+
+  if (editMode) {
+    enableEditing();
+  } else {
+    disableEditing();
+    saveEdits();
+  }
+}
+
+function enableEditing() {
+  // Make text elements editable
+  const selectors = [
+    'section h2', 'section h3', 'section > p', '.card h3', '.card p',
+    '.callout', '.hero h1', '.hero .subtitle',
+    '.timeline-item h4', '.timeline-item p',
+    'li', 'details summary', '.code-block', '.flow'
+  ];
+  mainEl.querySelectorAll(selectors.join(',')).forEach(el => {
+    el.setAttribute('contenteditable', 'true');
+    el.classList.add('editable');
+  });
+  // Make table cells editable
+  mainEl.querySelectorAll('td').forEach(td => {
+    td.setAttribute('contenteditable', 'true');
+    td.classList.add('editable');
+  });
+  // Add "add row" buttons to tables
+  mainEl.querySelectorAll('table').forEach(table => {
+    if (table.querySelector('.add-row-btn')) return;
+    const btn = document.createElement('button');
+    btn.className = 'add-row-btn';
+    btn.textContent = '+ Add row';
+    btn.onclick = function() {
+      const tbody = table.querySelector('tbody');
+      if (!tbody) return;
+      const lastRow = tbody.lastElementChild;
+      if (!lastRow) return;
+      const newRow = lastRow.cloneNode(true);
+      newRow.querySelectorAll('td').forEach(td => {
+        td.textContent = '...';
+        td.setAttribute('contenteditable', 'true');
+        td.classList.add('editable');
+      });
+      tbody.appendChild(newRow);
+    };
+    table.parentNode.insertBefore(btn, table.nextSibling);
+  });
+}
+
+function disableEditing() {
+  mainEl.querySelectorAll('[contenteditable]').forEach(el => {
+    el.removeAttribute('contenteditable');
+    el.classList.remove('editable');
+  });
+}
+
+function saveEdits() {
+  localStorage.setItem(STORAGE_KEY, mainEl.innerHTML);
+  const indicator = document.getElementById('savedIndicator');
+  indicator.classList.add('show');
+  setTimeout(() => indicator.classList.remove('show'), 1500);
+  document.getElementById('editStatus').textContent = 'Saved';
+}
+
+// Auto-save while editing (debounced)
+let saveTimer;
+mainEl.addEventListener('input', () => {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveEdits, 2000);
+  document.getElementById('editStatus').textContent = 'Editing...';
+});
+
+function exportData() {
+  const html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+  const blob = new Blob([html], { type: 'text/html' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'beacon-dashboard-edited.html';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function resetEdits() {
+  if (!confirm('Reset all edits to the original version?')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  mainEl.innerHTML = originalHTML;
+  if (editMode) toggleEdit();
+  document.getElementById('editStatus').textContent = 'Reset to original';
+}
+</script>
+
+</body>
+</html>
