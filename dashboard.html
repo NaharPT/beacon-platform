@@ -1390,10 +1390,6 @@ WHERE last_updated &lt; NOW() - INTERVAL '90 days'
   </table>
 </section>
 
-<div style="text-align:center; padding:40px; color:var(--text-secondary); font-size:13px;">
-  Beacon 1.0 Execution Approach &mdash; Generated 2026-02-04 &mdash; Confidential
-</div>
-
 </main>
 
 <!-- PRESENTATION MATERIALS PANEL -->
@@ -1495,69 +1491,105 @@ function updateActive() {
 window.addEventListener('scroll', updateActive);
 updateActive();
 
-// --- Presentation Materials Management (IndexedDB for large files) ---
-const DB_NAME = 'BeaconMaterialsDB';
-const DB_VERSION = 1;
-const STORE_NAME = 'materials';
-let db = null;
+// --- Presentation Materials Management (Supabase Storage for cloud sync) ---
+// Uses the same Supabase client from beacon-collab.js (global 'supabase' variable)
 
-// Initialize IndexedDB
-function initDB() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => { db = request.result; resolve(db); };
-    request.onupgradeneeded = (e) => {
-      const database = e.target.result;
-      if (!database.objectStoreNames.contains(STORE_NAME)) {
-        database.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
-      }
-    };
-  });
+async function waitForSupabase() {
+  // Wait for beacon-collab.js to initialize Supabase
+  let attempts = 0;
+  while (!window.supabase && attempts < 50) {
+    await new Promise(r => setTimeout(r, 100));
+    attempts++;
+  }
+  return window.supabase;
 }
 
 async function loadMaterials() {
-  if (!db) await initDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readonly');
-    const store = tx.objectStore(STORE_NAME);
-    const request = store.getAll();
-    request.onsuccess = () => resolve(request.result || []);
-    request.onerror = () => reject(request.error);
-  });
+  const sb = await waitForSupabase();
+  if (!sb) {
+    console.log('Materials: Supabase not available');
+    return [];
+  }
+
+  const { data, error } = await sb
+    .from('presentation_materials')
+    .select('*')
+    .order('added_at', { ascending: false });
+
+  if (error) {
+    console.error('Load materials error:', error);
+    return [];
+  }
+  return data || [];
 }
 
-async function saveMaterial(material) {
-  if (!db) await initDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    const store = tx.objectStore(STORE_NAME);
-    const request = store.add(material);
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
+async function saveMaterialMetadata(material) {
+  const sb = await waitForSupabase();
+  if (!sb) return null;
+
+  const { data, error } = await sb
+    .from('presentation_materials')
+    .insert(material)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Save material error:', error);
+    throw error;
+  }
+  return data;
 }
 
-async function deleteMaterialById(id) {
-  if (!db) await initDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    const store = tx.objectStore(STORE_NAME);
-    const request = store.delete(id);
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-  });
+async function deleteMaterialById(id, filePath) {
+  const sb = await waitForSupabase();
+  if (!sb) return;
+
+  // Delete from storage if it's a file (not a link)
+  if (filePath) {
+    const { error: storageError } = await sb.storage
+      .from('materials')
+      .remove([filePath]);
+    if (storageError) console.warn('Storage delete warning:', storageError);
+  }
+
+  // Delete metadata
+  const { error } = await sb
+    .from('presentation_materials')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    console.error('Delete material error:', error);
+    throw error;
+  }
 }
 
 async function clearAllMaterialsDB() {
-  if (!db) await initDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    const store = tx.objectStore(STORE_NAME);
-    const request = store.clear();
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-  });
+  const sb = await waitForSupabase();
+  if (!sb) return;
+
+  // Get all materials to find file paths
+  const materials = await loadMaterials();
+  const filePaths = materials.filter(m => m.file_path).map(m => m.file_path);
+
+  // Delete all files from storage
+  if (filePaths.length > 0) {
+    const { error: storageError } = await sb.storage
+      .from('materials')
+      .remove(filePaths);
+    if (storageError) console.warn('Storage clear warning:', storageError);
+  }
+
+  // Delete all metadata
+  const { error } = await sb
+    .from('presentation_materials')
+    .delete()
+    .neq('id', 0); // Delete all rows
+
+  if (error) {
+    console.error('Clear materials error:', error);
+    throw error;
+  }
 }
 
 function getFileIcon(filename) {
@@ -1582,7 +1614,7 @@ async function renderMaterials() {
 
   slideList.innerHTML = materials.map((item) => `
     <div class="slide-item" data-id="${item.id}" onclick="openMaterial(${item.id})" style="cursor:pointer;" title="Click to open">
-      <div class="slide-icon">${item.isLink ? 'LINK' : getFileIcon(item.name)}</div>
+      <div class="slide-icon">${item.is_link ? 'LINK' : getFileIcon(item.name)}</div>
       <div class="slide-title">${item.name}</div>
       <button class="delete-btn" onclick="deleteMaterial(${item.id}, event)" title="Delete">&times;</button>
     </div>
@@ -1595,36 +1627,37 @@ async function openMaterial(id) {
   if (!item) return;
 
   // Handle external links
-  if (item.isLink) {
+  if (item.is_link) {
     window.open(item.url, '_blank');
     return;
   }
 
-  if (!item.blob) {
-    showPanelNotification('File content not available - re-add the file', 'error');
+  // Use Supabase Storage URL
+  if (!item.url) {
+    showPanelNotification('File URL not available', 'error');
     return;
   }
-
-  // Create URL from stored blob
-  const url = URL.createObjectURL(item.blob);
 
   // For viewable types, open in new tab; otherwise download
   const viewableTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/gif', 'image/webp'];
   if (viewableTypes.includes(item.type)) {
-    window.open(url, '_blank');
+    window.open(item.url, '_blank');
   } else {
     // Trigger download for non-viewable files (PPT, DOC, XLS)
     const a = document.createElement('a');
-    a.href = url;
+    a.href = item.url;
     a.download = item.name;
     a.click();
   }
-
-  // Clean up after a delay
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 async function addMaterial(file) {
+  const sb = await waitForSupabase();
+  if (!sb) {
+    showPanelNotification('Supabase not configured - see SETUP.md', 'error');
+    return;
+  }
+
   const materials = await loadMaterials();
 
   // Check for duplicates
@@ -1634,20 +1667,45 @@ async function addMaterial(file) {
   }
 
   try {
-    // Store the file blob directly in IndexedDB (supports large files!)
-    await saveMaterial({
+    showPanelNotification('Uploading...', 'info');
+
+    // Generate unique file path
+    const timestamp = Date.now();
+    const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const filePath = `${timestamp}_${safeName}`;
+
+    // Upload to Supabase Storage
+    const { data: uploadData, error: uploadError } = await sb.storage
+      .from('materials')
+      .upload(filePath, file);
+
+    if (uploadError) {
+      console.error('Upload error:', uploadError);
+      showPanelNotification('Upload failed: ' + uploadError.message, 'error');
+      return;
+    }
+
+    // Get public URL
+    const { data: urlData } = sb.storage
+      .from('materials')
+      .getPublicUrl(filePath);
+
+    // Save metadata to database
+    await saveMaterialMetadata({
       name: file.name,
+      file_path: filePath,
+      url: urlData.publicUrl,
+      is_link: false,
       size: file.size,
-      type: file.type,
-      blob: file,
-      addedAt: new Date().toISOString()
+      type: file.type
     });
+
     await renderMaterials();
     const sizeMB = (file.size / 1024 / 1024).toFixed(1);
     showPanelNotification(`Added: ${file.name} (${sizeMB} MB)`);
   } catch (err) {
     console.error('Storage error:', err);
-    showPanelNotification('Storage error - try clearing storage first', 'error');
+    showPanelNotification('Storage error: ' + err.message, 'error');
   }
 }
 
@@ -1657,13 +1715,19 @@ async function deleteMaterial(id, event) {
   const item = materials.find(m => m.id === id);
 
   if (item && confirm(`Delete "${item.name}" from presentation materials?`)) {
-    await deleteMaterialById(id);
+    await deleteMaterialById(id, item.file_path);
     await renderMaterials();
     showPanelNotification('Deleted: ' + item.name);
   }
 }
 
 async function addLinkMaterial() {
+  const sb = await waitForSupabase();
+  if (!sb) {
+    showPanelNotification('Supabase not configured - see SETUP.md', 'error');
+    return;
+  }
+
   const name = prompt('Name for this link:');
   if (!name) return;
 
@@ -1678,11 +1742,10 @@ async function addLinkMaterial() {
     return;
   }
 
-  await saveMaterial({
+  await saveMaterialMetadata({
     name: name,
     url: url,
-    isLink: true,
-    addedAt: new Date().toISOString()
+    is_link: true
   });
 
   await renderMaterials();
@@ -1758,12 +1821,27 @@ fileInput.addEventListener('change', (e) => {
   fileInput.value = ''; // Reset for next selection
 });
 
-// Initialize IndexedDB and render materials
-initDB().then(() => renderMaterials()).catch(err => {
-  console.error('DB init error:', err);
-  document.getElementById('slideList').innerHTML = '<div class="empty-state">Storage error. Try refreshing.</div>';
-});
+// Initialize materials from Supabase
+(async function initMaterials() {
+  const sb = await waitForSupabase();
+  if (sb) {
+    await renderMaterials();
+  } else {
+    document.getElementById('slideList').innerHTML = '<div class="empty-state">Supabase not configured.<br>See SETUP.md</div>';
+  }
+})();
 </script>
+
+<footer style="
+  margin-left: var(--sidebar-w);
+  padding: 24px 40px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-secondary);
+  border-top: 1px solid var(--border);
+">
+  Beacon Platform by <strong>Nuno Valerio</strong>
+</footer>
 
 </body>
 </html>

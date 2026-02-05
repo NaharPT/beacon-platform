@@ -24,9 +24,10 @@ async function initBeacon() {
     return;
   }
 
-  // Initialize Supabase client
+  // Initialize Supabase client (also expose globally for materials panel)
   const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
   supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+  window.supabase = supabase;
 
   // Load current version and history
   await loadVersionHistory();
