@@ -16,8 +16,8 @@ let pageId = window.location.pathname.split('/').pop().replace('.html', '') || '
 document.addEventListener('DOMContentLoaded', initBeacon);
 
 async function initBeacon() {
-  // Check if Supabase is configured
-  if (typeof SUPABASE_URL === 'undefined' || SUPABASE_URL === 'YOUR_SUPABASE_URL') {
+  // Check if Supabase is configured (read from window.* for ES module compatibility)
+  if (typeof window.SUPABASE_URL === 'undefined' || window.SUPABASE_URL === 'YOUR_SUPABASE_URL') {
     console.log('Beacon: Supabase not configured. See SETUP.md');
     addVersionBadge('Local Mode', 'Setup Supabase to enable collaboration');
     addEditUI();
@@ -26,7 +26,7 @@ async function initBeacon() {
 
   // Initialize Supabase client (also expose globally for materials panel)
   const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
-  supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+  supabase = createClient(window.SUPABASE_URL, window.SUPABASE_KEY);
   window.supabase = supabase;
 
   // Load current version and history
