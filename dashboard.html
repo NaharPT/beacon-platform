@@ -140,40 +140,6 @@ details .detail-body { padding: 0 20px 20px; }
 .roadmap-bar { display: flex; border-radius: var(--radius); overflow: hidden; height: 40px; margin-bottom: 16px; }
 .roadmap-bar div { display: flex; align-items: center; justify-content: center; color: #fff; font-size: 13px; font-weight: 600; }
 
-/* Edit Mode */
-.edit-toolbar {
-  position: fixed; bottom: 20px; right: 20px; z-index: 200;
-  display: flex; gap: 8px; align-items: center;
-  background: var(--primary); padding: 10px 16px; border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.25); transition: opacity 0.2s;
-}
-.edit-toolbar button {
-  background: rgba(255,255,255,0.12); border: none; color: #fff;
-  padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 13px;
-  font-weight: 600; transition: background 0.15s; white-space: nowrap;
-}
-.edit-toolbar button:hover { background: rgba(255,255,255,0.22); }
-.edit-toolbar button.active { background: var(--accent); }
-.edit-toolbar .sep { width: 1px; height: 24px; background: rgba(255,255,255,0.15); }
-.edit-toolbar .edit-status { color: #94a3b8; font-size: 11px; white-space: nowrap; }
-
-body.edit-mode .editable { outline: 1px dashed #93c5fd; outline-offset: 1px; cursor: text; }
-body.edit-mode .editable:focus { outline: 2px solid var(--accent); background: var(--accent-light); }
-body.edit-mode td.editable { outline: none; border: 1px dashed #93c5fd; }
-body.edit-mode td.editable:focus { background: var(--accent-light); border-color: var(--accent); }
-body.edit-mode .add-row-btn { display: block !important; }
-.add-row-btn {
-  display: none !important; margin: 4px 0; padding: 4px 12px; font-size: 12px;
-  background: var(--accent-light); color: var(--accent); border: 1px dashed var(--accent);
-  border-radius: 4px; cursor: pointer; width: 100%;
-}
-.saved-indicator {
-  position: fixed; top: 20px; right: 20px; background: var(--green); color: #fff;
-  padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600;
-  z-index: 300; opacity: 0; transition: opacity 0.3s; pointer-events: none;
-}
-.saved-indicator.show { opacity: 1; }
-
 /* Print */
 @media print {
   nav.sidebar { display: none; }
@@ -181,8 +147,6 @@ body.edit-mode .add-row-btn { display: block !important; }
   .hero { padding: 24px; }
   details { break-inside: avoid; }
   details[open] { break-inside: auto; }
-  .edit-toolbar { display: none; }
-  .add-row-btn { display: none !important; }
 }
 </style>
 <script src="config.js"></script>
@@ -1373,17 +1337,7 @@ WHERE last_updated &lt; NOW() - INTERVAL '90 days'
 
 </main>
 
-<!-- EDIT TOOLBAR -->
-<div class="edit-toolbar" id="editToolbar">
-  <button id="editToggle" onclick="toggleEdit()">Edit Mode</button>
-  <div class="sep"></div>
-  <button id="exportBtn" onclick="exportData()" style="display:none;">Export HTML</button>
-  <button id="resetBtn" onclick="resetEdits()" style="display:none;">Reset</button>
-  <span class="edit-status" id="editStatus"></span>
-</div>
-<div class="saved-indicator" id="savedIndicator">Saved</div>
-
-<!-- SIDEBAR ACTIVE STATE + EDIT MODE -->
+<!-- SIDEBAR ACTIVE STATE -->
 <script>
 // --- Sidebar active tracking ---
 const links = document.querySelectorAll('nav.sidebar a');
@@ -1401,118 +1355,6 @@ function updateActive() {
 }
 window.addEventListener('scroll', updateActive);
 updateActive();
-
-// --- Edit Mode ---
-const STORAGE_KEY = 'beacon-dashboard-edits';
-let editMode = false;
-const mainEl = document.querySelector('main');
-const originalHTML = mainEl.innerHTML;
-
-// Restore saved edits on load
-(function restoreEdits() {
-  const saved = localStorage.getItem(STORAGE_KEY);
-  if (saved) {
-    mainEl.innerHTML = saved;
-    document.getElementById('editStatus').textContent = 'Saved edits loaded';
-  }
-})();
-
-function toggleEdit() {
-  editMode = !editMode;
-  document.body.classList.toggle('edit-mode', editMode);
-  document.getElementById('editToggle').classList.toggle('active', editMode);
-  document.getElementById('exportBtn').style.display = editMode ? '' : 'none';
-  document.getElementById('resetBtn').style.display = editMode ? '' : 'none';
-  document.getElementById('editStatus').textContent = editMode ? 'Click any text to edit' : '';
-
-  if (editMode) {
-    enableEditing();
-  } else {
-    disableEditing();
-    saveEdits();
-  }
-}
-
-function enableEditing() {
-  // Make text elements editable
-  const selectors = [
-    'section h2', 'section h3', 'section > p', '.card h3', '.card p',
-    '.callout', '.hero h1', '.hero .subtitle',
-    '.timeline-item h4', '.timeline-item p',
-    'li', 'details summary', '.code-block', '.flow'
-  ];
-  mainEl.querySelectorAll(selectors.join(',')).forEach(el => {
-    el.setAttribute('contenteditable', 'true');
-    el.classList.add('editable');
-  });
-  // Make table cells editable
-  mainEl.querySelectorAll('td').forEach(td => {
-    td.setAttribute('contenteditable', 'true');
-    td.classList.add('editable');
-  });
-  // Add "add row" buttons to tables
-  mainEl.querySelectorAll('table').forEach(table => {
-    if (table.querySelector('.add-row-btn')) return;
-    const btn = document.createElement('button');
-    btn.className = 'add-row-btn';
-    btn.textContent = '+ Add row';
-    btn.onclick = function() {
-      const tbody = table.querySelector('tbody');
-      if (!tbody) return;
-      const lastRow = tbody.lastElementChild;
-      if (!lastRow) return;
-      const newRow = lastRow.cloneNode(true);
-      newRow.querySelectorAll('td').forEach(td => {
-        td.textContent = '...';
-        td.setAttribute('contenteditable', 'true');
-        td.classList.add('editable');
-      });
-      tbody.appendChild(newRow);
-    };
-    table.parentNode.insertBefore(btn, table.nextSibling);
-  });
-}
-
-function disableEditing() {
-  mainEl.querySelectorAll('[contenteditable]').forEach(el => {
-    el.removeAttribute('contenteditable');
-    el.classList.remove('editable');
-  });
-}
-
-function saveEdits() {
-  localStorage.setItem(STORAGE_KEY, mainEl.innerHTML);
-  const indicator = document.getElementById('savedIndicator');
-  indicator.classList.add('show');
-  setTimeout(() => indicator.classList.remove('show'), 1500);
-  document.getElementById('editStatus').textContent = 'Saved';
-}
-
-// Auto-save while editing (debounced)
-let saveTimer;
-mainEl.addEventListener('input', () => {
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(saveEdits, 2000);
-  document.getElementById('editStatus').textContent = 'Editing...';
-});
-
-function exportData() {
-  const html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
-  const blob = new Blob([html], { type: 'text/html' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'beacon-dashboard-edited.html';
-  a.click();
-  URL.revokeObjectURL(a.href);
-}
-
-function resetEdits() {
-  if (!confirm('Reset all edits to the original version?')) return;
-  localStorage.removeItem(STORAGE_KEY);
-  mainEl.innerHTML = originalHTML;
-  if (editMode) toggleEdit();
-  document.getElementById('editStatus').textContent = 'Reset to original';
-}
 </script>
 
 </body>

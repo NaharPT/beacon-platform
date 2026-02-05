@@ -109,7 +109,7 @@ function addVersionBadge(version, subtitle) {
     <div style="font-size:11px;opacity:0.8;margin-top:2px">${subtitle}</div>
   `;
   badge.style.cssText = `
-    position:fixed; top:20px; left:20px; z-index:99999;
+    position:fixed; top:20px; right:20px; z-index:99999;
     background:rgba(30,58,95,0.95); color:white;
     padding:12px 16px; border-radius:8px;
     font-family:system-ui,sans-serif;
