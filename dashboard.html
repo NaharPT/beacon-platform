@@ -1405,9 +1405,13 @@ WHERE last_updated &lt; NOW() - INTERVAL '90 days'
   <div class="drop-zone" id="dropZone">
     <div class="drop-zone-content">
       <span style="font-size:24px;">+</span>
-      <span>Drop files here or click to add</span>
+      <span>Drop small files (&lt;4MB)</span>
     </div>
     <input type="file" id="fileInput" style="display:none;" multiple accept=".pdf,.pptx,.ppt,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.gif">
+  </div>
+  <div style="display:flex;gap:8px;margin:0 12px 12px;">
+    <button onclick="addLinkMaterial()" style="flex:1;padding:8px;background:var(--accent-light);border:1px solid var(--accent);border-radius:6px;color:var(--accent);font-size:11px;cursor:pointer;">+ Add Link</button>
+    <button onclick="clearAllMaterials()" style="padding:8px 12px;background:#fee2e2;border:1px solid #fca5a5;border-radius:6px;color:#dc2626;font-size:11px;cursor:pointer;">Clear All</button>
   </div>
 </div>
 
@@ -1519,13 +1523,13 @@ function renderMaterials() {
   const materials = loadMaterials();
 
   if (materials.length === 0) {
-    slideList.innerHTML = '<div class="empty-state">No materials yet. Drop files above to add.</div>';
+    slideList.innerHTML = '<div class="empty-state">No materials yet.<br>Use "Add Link" for large files.</div>';
     return;
   }
 
   slideList.innerHTML = materials.map((item, index) => `
     <div class="slide-item" data-index="${index}" onclick="openMaterial(${index})" style="cursor:pointer;" title="Click to open">
-      <div class="slide-icon">${getFileIcon(item.name)}</div>
+      <div class="slide-icon">${item.isLink ? 'LINK' : getFileIcon(item.name)}</div>
       <div class="slide-title">${item.name}</div>
       <button class="delete-btn" onclick="deleteMaterial(${index}, event)" title="Delete">&times;</button>
     </div>
@@ -1535,6 +1539,12 @@ function renderMaterials() {
 function openMaterial(index) {
   const materials = loadMaterials();
   const item = materials[index];
+
+  // Handle external links
+  if (item.isLink) {
+    window.open(item.url, '_blank');
+    return;
+  }
 
   if (!item.dataUrl) {
     showPanelNotification('File content not available - re-add the file', 'error');
@@ -1615,6 +1625,47 @@ function deleteMaterial(index, event) {
     saveMaterials(materials);
     renderMaterials();
     showPanelNotification('Deleted: ' + item.name);
+  }
+}
+
+function addLinkMaterial() {
+  const name = prompt('Name for this link:');
+  if (!name) return;
+
+  const url = prompt('URL (e.g., OneDrive, Google Drive, SharePoint link):');
+  if (!url) return;
+
+  const materials = loadMaterials();
+
+  // Check for duplicates
+  if (materials.some(m => m.name === name)) {
+    showPanelNotification('Name already exists', 'error');
+    return;
+  }
+
+  materials.push({
+    name: name,
+    url: url,
+    isLink: true,
+    addedAt: new Date().toISOString()
+  });
+
+  saveMaterials(materials);
+  renderMaterials();
+  showPanelNotification('Added link: ' + name);
+}
+
+function clearAllMaterials() {
+  const materials = loadMaterials();
+  if (materials.length === 0) {
+    showPanelNotification('Already empty', 'error');
+    return;
+  }
+
+  if (confirm(`Delete all ${materials.length} presentation material(s)?`)) {
+    localStorage.removeItem(STORAGE_KEY);
+    renderMaterials();
+    showPanelNotification('All materials cleared');
   }
 }
 
