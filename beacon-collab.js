@@ -239,6 +239,64 @@ function toggleEditMode() {
   }
 }
 
+function addFormatToolbar() {
+  document.getElementById('beacon-format-toolbar')?.remove();
+
+  const toolbar = document.createElement('div');
+  toolbar.id = 'beacon-format-toolbar';
+  toolbar.innerHTML = `
+    <button onclick="formatText('bold')" title="Bold (Ctrl+B)" style="
+      background:none; border:1px solid #e2e8f0; padding:6px 10px;
+      border-radius:4px; cursor:pointer; font-weight:bold; font-size:14px;
+    ">B</button>
+    <button onclick="formatText('italic')" title="Italic (Ctrl+I)" style="
+      background:none; border:1px solid #e2e8f0; padding:6px 10px;
+      border-radius:4px; cursor:pointer; font-style:italic; font-size:14px;
+    ">I</button>
+    <span style="width:1px;background:#e2e8f0;margin:0 8px;"></span>
+    <button onclick="changeFontSize(-1)" title="Decrease size" style="
+      background:none; border:1px solid #e2e8f0; padding:6px 10px;
+      border-radius:4px; cursor:pointer; font-size:12px;
+    ">A-</button>
+    <button onclick="changeFontSize(1)" title="Increase size" style="
+      background:none; border:1px solid #e2e8f0; padding:6px 10px;
+      border-radius:4px; cursor:pointer; font-size:16px;
+    ">A+</button>
+  `;
+  toolbar.style.cssText = `
+    position:fixed; top:80px; right:20px; z-index:99999;
+    background:white; padding:8px 12px; border-radius:8px;
+    box-shadow:0 4px 12px rgba(0,0,0,0.15);
+    font-family:system-ui,sans-serif;
+    display:flex; align-items:center; gap:6px;
+  `;
+  document.body.appendChild(toolbar);
+}
+
+function formatText(command) {
+  document.execCommand(command, false, null);
+}
+
+function changeFontSize(direction) {
+  const selection = window.getSelection();
+  if (!selection.rangeCount) return;
+
+  // Get the current font size of the selection
+  const range = selection.getRangeAt(0);
+  if (range.collapsed) return;
+
+  // Use fontSize command (1-7 scale, we'll use 3 as default)
+  const currentSize = document.queryCommandValue('fontSize') || '3';
+  let newSize = parseInt(currentSize) + direction;
+  newSize = Math.max(1, Math.min(7, newSize)); // Clamp between 1 and 7
+
+  document.execCommand('fontSize', false, newSize.toString());
+}
+
+function removeFormatToolbar() {
+  document.getElementById('beacon-format-toolbar')?.remove();
+}
+
 function enableEditing() {
   const editableSelectors = [
     'h1', 'h2', 'h3',
@@ -251,7 +309,7 @@ function enableEditing() {
   editableSelectors.forEach(selector => {
     document.querySelectorAll(selector).forEach(el => {
       if (el.closest('#beacon-edit-ui') || el.closest('#beacon-version-badge') ||
-          el.closest('#beacon-history-panel')) return;
+          el.closest('#beacon-history-panel') || el.closest('#beacon-format-toolbar')) return;
 
       el.setAttribute('contenteditable', 'true');
       el.style.outline = '2px dashed rgba(59,130,246,0.3)';
@@ -261,6 +319,9 @@ function enableEditing() {
       el.addEventListener('blur', handleEditBlur);
     });
   });
+
+  // Show format toolbar
+  addFormatToolbar();
 }
 
 function handleEditFocus(e) {
@@ -283,6 +344,9 @@ function disableEditing() {
     el.removeEventListener('focus', handleEditFocus);
     el.removeEventListener('blur', handleEditBlur);
   });
+
+  // Hide format toolbar
+  removeFormatToolbar();
 }
 
 async function saveChanges() {
@@ -400,3 +464,5 @@ function showNotification(message, type = 'success') {
 window.toggleEditMode = toggleEditMode;
 window.showVersionHistory = showVersionHistory;
 window.revertToVersion = revertToVersion;
+window.formatText = formatText;
+window.changeFontSize = changeFontSize;
