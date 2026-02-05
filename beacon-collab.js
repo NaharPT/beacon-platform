@@ -289,7 +289,7 @@ function addFormatToolbar() {
     ">A+</button>
   `;
   toolbar.style.cssText = `
-    position:fixed; top:80px; right:20px; z-index:99999;
+    position:fixed; top:80px; right:320px; z-index:99999;
     background:white; padding:8px 12px; border-radius:8px;
     box-shadow:0 4px 12px rgba(0,0,0,0.15);
     font-family:system-ui,sans-serif;
