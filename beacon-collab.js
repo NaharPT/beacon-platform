@@ -209,6 +209,14 @@ function addEditUI() {
   const container = document.createElement('div');
   container.id = 'beacon-edit-ui';
   container.innerHTML = `
+    <button id="beacon-cancel-btn" onclick="cancelEdits()" style="
+      background:linear-gradient(135deg,#64748b,#475569);
+      color:white; border:none; padding:12px 24px; border-radius:8px;
+      font-size:14px; font-weight:600; cursor:pointer;
+      box-shadow:0 4px 12px rgba(100,116,139,0.4);
+      transition:transform 0.2s; display:none; margin-right:8px;
+    " onmouseover="this.style.transform='scale(1.05)'"
+       onmouseout="this.style.transform='scale(1)'">Cancel</button>
     <button id="beacon-edit-btn" onclick="toggleEditMode()" style="
       background:linear-gradient(135deg,#3b82f6,#1d4ed8);
       color:white; border:none; padding:12px 24px; border-radius:8px;
@@ -220,7 +228,7 @@ function addEditUI() {
   `;
   container.style.cssText = `
     position:fixed; bottom:20px; right:20px; z-index:99999;
-    font-family:system-ui,sans-serif;
+    font-family:system-ui,sans-serif; display:flex; align-items:center;
   `;
   document.body.appendChild(container);
 }
@@ -228,15 +236,32 @@ function addEditUI() {
 function toggleEditMode() {
   isEditMode = !isEditMode;
   const btn = document.getElementById('beacon-edit-btn');
+  const cancelBtn = document.getElementById('beacon-cancel-btn');
 
   if (isEditMode) {
     enableEditing();
     btn.textContent = 'Save';
     btn.style.background = 'linear-gradient(135deg,#10b981,#059669)';
+    cancelBtn.style.display = 'inline-block';
     showNotification('Edit mode ON - Click any text to edit');
   } else {
     saveChanges();
   }
+}
+
+function cancelEdits() {
+  isEditMode = false;
+  disableEditing();
+
+  const btn = document.getElementById('beacon-edit-btn');
+  const cancelBtn = document.getElementById('beacon-cancel-btn');
+
+  btn.textContent = 'Edit';
+  btn.style.background = 'linear-gradient(135deg,#3b82f6,#1d4ed8)';
+  cancelBtn.style.display = 'none';
+
+  // Reload page to discard unsaved changes
+  location.reload();
 }
 
 function addFormatToolbar() {
@@ -388,6 +413,7 @@ async function saveChanges() {
       btn.textContent = 'Edit';
       btn.disabled = false;
       btn.style.background = 'linear-gradient(135deg,#3b82f6,#1d4ed8)';
+      document.getElementById('beacon-cancel-btn').style.display = 'none';
       return;
     }
   }
@@ -398,6 +424,7 @@ async function saveChanges() {
   btn.textContent = 'Edit';
   btn.disabled = false;
   btn.style.background = 'linear-gradient(135deg,#3b82f6,#1d4ed8)';
+  document.getElementById('beacon-cancel-btn').style.display = 'none';
   showNotification(`Saved as v${currentVersion.major}.${currentVersion.minor}!`);
 }
 
@@ -466,3 +493,4 @@ window.showVersionHistory = showVersionHistory;
 window.revertToVersion = revertToVersion;
 window.formatText = formatText;
 window.changeFontSize = changeFontSize;
+window.cancelEdits = cancelEdits;
