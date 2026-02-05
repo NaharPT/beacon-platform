@@ -1656,16 +1656,25 @@ function addLinkMaterial() {
 }
 
 function clearAllMaterials() {
-  const materials = loadMaterials();
-  if (materials.length === 0) {
-    showPanelNotification('Already empty', 'error');
-    return;
+  // Calculate total storage used
+  let totalSize = 0;
+  for (let key in localStorage) {
+    if (localStorage.hasOwnProperty(key)) {
+      totalSize += localStorage[key].length * 2; // UTF-16 = 2 bytes per char
+    }
   }
+  const usedMB = (totalSize / 1024 / 1024).toFixed(2);
 
-  if (confirm(`Delete all ${materials.length} presentation material(s)?`)) {
-    localStorage.removeItem(STORAGE_KEY);
+  const choice = confirm(
+    `Storage used: ${usedMB} MB\n\n` +
+    `Click OK to clear ALL site storage (materials, slide edits, etc.)\n` +
+    `Click Cancel to abort.`
+  );
+
+  if (choice) {
+    localStorage.clear();
     renderMaterials();
-    showPanelNotification('All materials cleared');
+    showPanelNotification('All storage cleared!');
   }
 }
 
