@@ -431,19 +431,129 @@ async function saveChanges() {
     return;
   }
 
-  const editorName = prompt(`Save ${changeCount} change${changeCount > 1 ? 's' : ''}? Enter your name:`, localStorage.getItem('beacon-editor') || '');
+  // Show custom save dialog
+  showSaveDialog(changeCount, changedContent);
+}
+
+function showSaveDialog(changeCount, changedContent) {
+  document.getElementById('beacon-save-dialog')?.remove();
+  document.getElementById('beacon-save-backdrop')?.remove();
+
+  const nextMinor = `v${currentVersion.major}.${currentVersion.minor + 1}`;
+  const nextMajor = `v${currentVersion.major + 1}.0`;
+  const savedName = localStorage.getItem('beacon-editor') || '';
+
+  const dialog = document.createElement('div');
+  dialog.id = 'beacon-save-dialog';
+  dialog.innerHTML = `
+    <div style="margin-bottom:20px;">
+      <h3 style="margin:0 0 8px 0;font-size:18px;color:#1e293b;">Save Changes</h3>
+      <p style="margin:0;color:#64748b;font-size:14px;">
+        ${changeCount} change${changeCount > 1 ? 's' : ''} detected
+      </p>
+    </div>
+
+    <div style="margin-bottom:16px;">
+      <label style="display:block;font-size:13px;color:#475569;margin-bottom:6px;">Your name</label>
+      <input type="text" id="beacon-save-name" value="${savedName}" placeholder="Enter your name" style="
+        width:100%; padding:10px 12px; border:1px solid #e2e8f0; border-radius:6px;
+        font-size:14px; box-sizing:border-box;
+      ">
+    </div>
+
+    <div style="margin-bottom:20px; padding:12px; background:#f8fafc; border-radius:8px;">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+        <input type="checkbox" id="beacon-major-release" style="width:18px;height:18px;cursor:pointer;">
+        <div>
+          <div style="font-size:14px;font-weight:600;color:#1e293b;">Major release</div>
+          <div style="font-size:12px;color:#64748b;">
+            Save as <strong>${nextMajor}</strong> instead of ${nextMinor}
+          </div>
+        </div>
+      </label>
+    </div>
+
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button onclick="closeSaveDialog()" style="
+        padding:10px 20px; border:1px solid #e2e8f0; background:white;
+        border-radius:6px; font-size:14px; cursor:pointer; color:#64748b;
+      ">Cancel</button>
+      <button onclick="confirmSave()" style="
+        padding:10px 20px; border:none; background:linear-gradient(135deg,#14b8a6,#7c3aed);
+        border-radius:6px; font-size:14px; cursor:pointer; color:white; font-weight:600;
+      ">Save</button>
+    </div>
+  `;
+  dialog.style.cssText = `
+    position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+    z-index:100002; background:white; padding:24px;
+    border-radius:12px; box-shadow:0 20px 60px rgba(0,0,0,0.3);
+    font-family:system-ui,sans-serif; width:380px; max-width:90vw;
+  `;
+
+  // Store changedContent for use in confirmSave
+  dialog.dataset.changedContent = JSON.stringify(changedContent);
+  dialog.dataset.changeCount = changeCount;
+
+  const backdrop = document.createElement('div');
+  backdrop.id = 'beacon-save-backdrop';
+  backdrop.style.cssText = `
+    position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:100001;
+  `;
+
+  document.body.appendChild(backdrop);
+  document.body.appendChild(dialog);
+
+  // Focus name input
+  document.getElementById('beacon-save-name').focus();
+
+  // Handle Enter key
+  document.getElementById('beacon-save-name').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') confirmSave();
+  });
+}
+
+function closeSaveDialog() {
+  document.getElementById('beacon-save-dialog')?.remove();
+  document.getElementById('beacon-save-backdrop')?.remove();
+  isEditMode = true; // Keep edit mode active
+}
+
+async function confirmSave() {
+  const dialog = document.getElementById('beacon-save-dialog');
+  const nameInput = document.getElementById('beacon-save-name');
+  const majorCheckbox = document.getElementById('beacon-major-release');
+
+  const editorName = nameInput.value.trim();
   if (!editorName) {
-    isEditMode = true;
+    nameInput.style.borderColor = '#ef4444';
+    nameInput.focus();
     return;
   }
+
   localStorage.setItem('beacon-editor', editorName);
 
+  const changedContent = JSON.parse(dialog.dataset.changedContent);
+  const changeCount = parseInt(dialog.dataset.changeCount);
+  const isMajorRelease = majorCheckbox.checked;
+
+  // Close dialog
+  closeSaveDialog();
   disableEditing();
+
   const btn = document.getElementById('beacon-edit-btn');
   btn.textContent = 'Saving...';
   btn.disabled = true;
 
-  const newMinor = currentVersion.minor + 1;
+  // Calculate new version
+  let newMajor, newMinor;
+  if (isMajorRelease) {
+    newMajor = currentVersion.major + 1;
+    newMinor = 0;
+  } else {
+    newMajor = currentVersion.major;
+    newMinor = currentVersion.minor + 1;
+  }
 
   if (supabase) {
     const { error } = await supabase
@@ -451,7 +561,7 @@ async function saveChanges() {
       .insert({
         page: pageId,
         content: changedContent,
-        version_major: currentVersion.major,
+        version_major: newMajor,
         version_minor: newMinor,
         updated_by: editorName
       });
@@ -467,6 +577,7 @@ async function saveChanges() {
     }
   }
 
+  currentVersion.major = newMajor;
   currentVersion.minor = newMinor;
   await loadVersionHistory();
 
@@ -474,7 +585,10 @@ async function saveChanges() {
   btn.disabled = false;
   btn.style.background = 'linear-gradient(135deg,#14b8a6,#7c3aed)';
   document.getElementById('beacon-cancel-btn').style.display = 'none';
-  showNotification(`Saved ${changeCount} change${changeCount > 1 ? 's' : ''} as v${currentVersion.major}.${currentVersion.minor}!`);
+
+  const versionStr = `v${newMajor}.${newMinor}`;
+  const releaseType = isMajorRelease ? 'Major release' : `${changeCount} change${changeCount > 1 ? 's' : ''}`;
+  showNotification(`${releaseType} saved as ${versionStr}!`);
 }
 
 function getUniqueSelector(el) {
@@ -895,3 +1009,6 @@ window.exportToWordFallback = exportToWordFallback;
 window.showEditHistory = showEditHistory;
 window.showVersionDetails = showVersionDetails;
 window.exportVersionsJSON = exportVersionsJSON;
+window.showSaveDialog = showSaveDialog;
+window.closeSaveDialog = closeSaveDialog;
+window.confirmSave = confirmSave;
