@@ -1577,12 +1577,6 @@ function addMaterial(file) {
     return;
   }
 
-  // Check file size (localStorage limit ~5MB total, warn at 2MB per file)
-  if (file.size > 2 * 1024 * 1024) {
-    showPanelNotification('File too large (max 2MB)', 'error');
-    return;
-  }
-
   // Read file as base64 data URL
   const reader = new FileReader();
   reader.onload = function(e) {
