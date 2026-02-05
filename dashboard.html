@@ -1426,14 +1426,77 @@ WHERE last_updated &lt; NOW() - INTERVAL '90 days'
 <div class="presentation-panel" id="presentationPanel">
   <h3>Presentation Materials</h3>
   <div class="slide-list" id="slideList">
-    <a class="slide-item" href="slides.html" target="_blank">
-      <div class="slide-icon">15</div>
-      <div class="slide-title">Full Slide Deck</div>
-    </a>
-    <!-- Add more slides here -->
+    <!-- Items loaded from localStorage -->
   </div>
-  <button class="add-slide" onclick="alert('Drop slide links here or add via Edit mode')">+ Add presentation</button>
+  <div class="drop-zone" id="dropZone">
+    <div class="drop-zone-content">
+      <span style="font-size:24px;">+</span>
+      <span>Drop files here or click to add</span>
+    </div>
+    <input type="file" id="fileInput" style="display:none;" multiple accept=".pdf,.pptx,.ppt,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.gif">
+  </div>
 </div>
+
+<style>
+.drop-zone {
+  margin: 12px;
+  padding: 20px;
+  border: 2px dashed var(--border);
+  border-radius: 8px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: #f8fafc;
+}
+.drop-zone:hover, .drop-zone.drag-over {
+  border-color: var(--teal);
+  background: #ccfbf1;
+}
+.drop-zone-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.slide-item {
+  position: relative;
+}
+.slide-item .delete-btn {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: #fee2e2;
+  color: #dc2626;
+  border-radius: 50%;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.slide-item:hover .delete-btn {
+  opacity: 1;
+}
+.slide-item .delete-btn:hover {
+  background: #dc2626;
+  color: white;
+}
+.empty-state {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+</style>
 
 <!-- SIDEBAR ACTIVE STATE -->
 <script>
@@ -1453,6 +1516,134 @@ function updateActive() {
 }
 window.addEventListener('scroll', updateActive);
 updateActive();
+
+// --- Presentation Materials Management ---
+const STORAGE_KEY = 'beacon-presentation-materials';
+
+function loadMaterials() {
+  const stored = localStorage.getItem(STORAGE_KEY);
+  return stored ? JSON.parse(stored) : [];
+}
+
+function saveMaterials(materials) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(materials));
+}
+
+function getFileIcon(filename) {
+  const ext = filename.split('.').pop().toLowerCase();
+  const icons = {
+    pdf: 'PDF', pptx: 'PPT', ppt: 'PPT',
+    doc: 'DOC', docx: 'DOC',
+    xls: 'XLS', xlsx: 'XLS',
+    png: 'IMG', jpg: 'IMG', jpeg: 'IMG', gif: 'IMG'
+  };
+  return icons[ext] || 'FILE';
+}
+
+function renderMaterials() {
+  const slideList = document.getElementById('slideList');
+  const materials = loadMaterials();
+
+  if (materials.length === 0) {
+    slideList.innerHTML = '<div class="empty-state">No materials yet. Drop files above to add.</div>';
+    return;
+  }
+
+  slideList.innerHTML = materials.map((item, index) => `
+    <div class="slide-item" data-index="${index}">
+      <div class="slide-icon">${getFileIcon(item.name)}</div>
+      <div class="slide-title">${item.name}</div>
+      <button class="delete-btn" onclick="deleteMaterial(${index}, event)" title="Delete">&times;</button>
+    </div>
+  `).join('');
+}
+
+function addMaterial(file) {
+  const materials = loadMaterials();
+
+  // Check for duplicates
+  if (materials.some(m => m.name === file.name)) {
+    showPanelNotification('File already exists', 'error');
+    return;
+  }
+
+  materials.push({
+    name: file.name,
+    size: file.size,
+    type: file.type,
+    addedAt: new Date().toISOString()
+  });
+
+  saveMaterials(materials);
+  renderMaterials();
+  showPanelNotification('Added: ' + file.name);
+}
+
+function deleteMaterial(index, event) {
+  event.stopPropagation();
+  const materials = loadMaterials();
+  const item = materials[index];
+
+  if (confirm(`Delete "${item.name}" from presentation materials?`)) {
+    materials.splice(index, 1);
+    saveMaterials(materials);
+    renderMaterials();
+    showPanelNotification('Deleted: ' + item.name);
+  }
+}
+
+function showPanelNotification(message, type = 'success') {
+  const existing = document.getElementById('panel-notification');
+  if (existing) existing.remove();
+
+  const notif = document.createElement('div');
+  notif.id = 'panel-notification';
+  notif.textContent = message;
+  notif.style.cssText = `
+    position: fixed; top: 80px; right: 20px; z-index: 100;
+    background: ${type === 'error' ? '#fee2e2' : '#ccfbf1'};
+    color: ${type === 'error' ? '#991b1b' : '#0f766e'};
+    padding: 8px 16px; border-radius: 6px; font-size: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  `;
+  document.body.appendChild(notif);
+  setTimeout(() => notif.remove(), 3000);
+}
+
+// Drop zone functionality
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+
+dropZone.addEventListener('click', () => fileInput.click());
+
+dropZone.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  dropZone.classList.add('drag-over');
+});
+
+dropZone.addEventListener('dragleave', () => {
+  dropZone.classList.remove('drag-over');
+});
+
+dropZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+
+  const files = e.dataTransfer.files;
+  for (const file of files) {
+    addMaterial(file);
+  }
+});
+
+fileInput.addEventListener('change', (e) => {
+  for (const file of e.target.files) {
+    addMaterial(file);
+  }
+  fileInput.value = ''; // Reset for next selection
+});
+
+// Initialize
+renderMaterials();
 </script>
 
 </body>
