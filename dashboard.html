@@ -1550,12 +1550,48 @@ function renderMaterials() {
   }
 
   slideList.innerHTML = materials.map((item, index) => `
-    <div class="slide-item" data-index="${index}">
+    <div class="slide-item" data-index="${index}" onclick="openMaterial(${index})" style="cursor:pointer;" title="Click to open">
       <div class="slide-icon">${getFileIcon(item.name)}</div>
       <div class="slide-title">${item.name}</div>
       <button class="delete-btn" onclick="deleteMaterial(${index}, event)" title="Delete">&times;</button>
     </div>
   `).join('');
+}
+
+function openMaterial(index) {
+  const materials = loadMaterials();
+  const item = materials[index];
+
+  if (!item.dataUrl) {
+    showPanelNotification('File content not available - re-add the file', 'error');
+    return;
+  }
+
+  // Convert base64 back to blob and open
+  const byteString = atob(item.dataUrl.split(',')[1]);
+  const mimeType = item.type || 'application/octet-stream';
+  const ab = new ArrayBuffer(byteString.length);
+  const ia = new Uint8Array(ab);
+  for (let i = 0; i < byteString.length; i++) {
+    ia[i] = byteString.charCodeAt(i);
+  }
+  const blob = new Blob([ab], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+
+  // For viewable types, open in new tab; otherwise download
+  const viewableTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+  if (viewableTypes.includes(mimeType)) {
+    window.open(url, '_blank');
+  } else {
+    // Trigger download for non-viewable files (PPT, DOC, XLS)
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = item.name;
+    a.click();
+  }
+
+  // Clean up after a delay
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function addMaterial(file) {
@@ -1567,16 +1603,38 @@ function addMaterial(file) {
     return;
   }
 
-  materials.push({
-    name: file.name,
-    size: file.size,
-    type: file.type,
-    addedAt: new Date().toISOString()
-  });
+  // Check file size (localStorage limit ~5MB total, warn at 2MB per file)
+  if (file.size > 2 * 1024 * 1024) {
+    showPanelNotification('File too large (max 2MB)', 'error');
+    return;
+  }
 
-  saveMaterials(materials);
-  renderMaterials();
-  showPanelNotification('Added: ' + file.name);
+  // Read file as base64 data URL
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const dataUrl = e.target.result;
+
+    materials.push({
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      dataUrl: dataUrl,
+      addedAt: new Date().toISOString()
+    });
+
+    try {
+      saveMaterials(materials);
+      renderMaterials();
+      showPanelNotification('Added: ' + file.name);
+    } catch (err) {
+      // localStorage quota exceeded
+      showPanelNotification('Storage full - remove some files first', 'error');
+    }
+  };
+  reader.onerror = function() {
+    showPanelNotification('Error reading file', 'error');
+  };
+  reader.readAsDataURL(file);
 }
 
 function deleteMaterial(index, event) {
