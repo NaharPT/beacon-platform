@@ -210,14 +210,22 @@ function addEditUI() {
   const container = document.createElement('div');
   container.id = 'beacon-edit-ui';
   container.innerHTML = `
-    <button id="beacon-export-btn" onclick="exportToFile()" style="
+    <button id="beacon-export-btn" onclick="exportToWord()" style="
       background:linear-gradient(135deg,#f59e0b,#d97706);
       color:white; border:none; padding:12px 24px; border-radius:8px;
       font-size:14px; font-weight:600; cursor:pointer;
       box-shadow:0 4px 12px rgba(245,158,11,0.4);
       transition:transform 0.2s; margin-right:8px;
     " onmouseover="this.style.transform='scale(1.05)'"
-       onmouseout="this.style.transform='scale(1)'" title="Download backup of all edits">Export</button>
+       onmouseout="this.style.transform='scale(1)'" title="Export page as Word document">Export</button>
+    <button id="beacon-history-btn" onclick="showEditHistory()" style="
+      background:linear-gradient(135deg,#6366f1,#4f46e5);
+      color:white; border:none; padding:12px 24px; border-radius:8px;
+      font-size:14px; font-weight:600; cursor:pointer;
+      box-shadow:0 4px 12px rgba(99,102,241,0.4);
+      transition:transform 0.2s; margin-right:8px;
+    " onmouseover="this.style.transform='scale(1.05)'"
+       onmouseout="this.style.transform='scale(1)'" title="View edit history and details">History</button>
     <button id="beacon-cancel-btn" onclick="cancelEdits()" style="
       background:linear-gradient(135deg,#64748b,#475569);
       color:white; border:none; padding:12px 24px; border-radius:8px;
@@ -496,71 +504,300 @@ function showNotification(message, type = 'success') {
   setTimeout(() => notif.remove(), 4000);
 }
 
-async function exportToFile() {
-  showNotification('Exporting edits...');
+function exportToWord() {
+  showNotification('Exporting to Word...');
 
   try {
-    // Fetch all versions from Supabase
-    const { data, error } = await supabase
-      .from('page_versions')
-      .select('*')
-      .order('updated_at', { ascending: false });
+    // Get the main content area (exclude UI elements)
+    const mainContent = document.querySelector('main') || document.querySelector('.content') || document.body;
 
-    if (error) throw error;
+    // Clone to avoid modifying the page
+    const clone = mainContent.cloneNode(true);
 
-    // Create markdown content
-    let md = `# Beacon Platform - Edit Backup\n\n`;
-    md += `Exported: ${new Date().toLocaleString()}\n`;
-    md += `Total versions: ${data.length}\n\n---\n\n`;
+    // Remove beacon UI elements from clone
+    clone.querySelectorAll('[id^="beacon-"], .materials-panel, script, style').forEach(el => el.remove());
 
-    for (const v of data) {
-      md += `## Version ${v.version_major}.${v.version_minor}\n`;
-      md += `- **Updated by:** ${v.updated_by}\n`;
-      md += `- **Updated at:** ${v.updated_at}\n`;
-      md += `- **Page:** ${v.page}\n\n`;
+    // Get page title
+    const title = document.querySelector('h1')?.textContent || 'Beacon Document';
+    const version = `v${currentVersion.major}.${currentVersion.minor}`;
+    const exportDate = new Date().toLocaleDateString('en-US', {
+      year: 'numeric', month: 'long', day: 'numeric'
+    });
 
-      const content = typeof v.content === 'string' ? JSON.parse(v.content) : v.content;
-      const selectorCount = Object.keys(content).length;
-      md += `Edited ${selectorCount} elements.\n\n`;
-
-      // Show first 10 edits as preview
-      const entries = Object.entries(content).slice(0, 10);
-      for (const [selector, html] of entries) {
-        const text = html.replace(/<[^>]+>/g, ' ').replace(/\\s+/g, ' ').trim().slice(0, 100);
-        md += `- \`${selector}\`: ${text}...\n`;
-      }
-      if (selectorCount > 10) {
-        md += `- ... and ${selectorCount - 10} more edits\n`;
-      }
-      md += `\n---\n\n`;
+    // Create Word-compatible HTML document
+    const wordDoc = `
+<!DOCTYPE html>
+<html xmlns:o="urn:schemas-microsoft-com:office:office"
+      xmlns:w="urn:schemas-microsoft-com:office:word"
+      xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+  <meta charset="utf-8">
+  <title>${title}</title>
+  <!--[if gte mso 9]>
+  <xml>
+    <w:WordDocument>
+      <w:View>Print</w:View>
+      <w:Zoom>100</w:Zoom>
+      <w:DoNotOptimizeForBrowser/>
+    </w:WordDocument>
+  </xml>
+  <![endif]-->
+  <style>
+    @page {
+      size: A4;
+      margin: 2.5cm 2cm 2cm 2cm;
     }
+    body {
+      font-family: Calibri, Arial, sans-serif;
+      font-size: 11pt;
+      line-height: 1.5;
+      color: #333;
+    }
+    h1 {
+      font-size: 24pt;
+      color: #0d9488;
+      border-bottom: 2px solid #0d9488;
+      padding-bottom: 8pt;
+      margin-bottom: 16pt;
+    }
+    h2 {
+      font-size: 16pt;
+      color: #7c3aed;
+      margin-top: 20pt;
+      margin-bottom: 10pt;
+    }
+    h3 {
+      font-size: 13pt;
+      color: #475569;
+      margin-top: 14pt;
+    }
+    p { margin: 8pt 0; }
+    ul, ol { margin: 8pt 0 8pt 20pt; }
+    li { margin: 4pt 0; }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 12pt 0;
+    }
+    th, td {
+      border: 1px solid #e2e8f0;
+      padding: 8pt 10pt;
+      text-align: left;
+    }
+    th {
+      background: #f1f5f9;
+      font-weight: bold;
+    }
+    .header-info {
+      color: #64748b;
+      font-size: 10pt;
+      margin-bottom: 20pt;
+    }
+    .card {
+      border: 1px solid #e2e8f0;
+      padding: 12pt;
+      margin: 10pt 0;
+      background: #fafafa;
+    }
+    code, pre {
+      font-family: Consolas, monospace;
+      font-size: 10pt;
+      background: #f1f5f9;
+      padding: 2pt 4pt;
+    }
+    pre {
+      padding: 10pt;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="header-info">
+    <strong>Beacon Platform</strong> | ${version} | Exported: ${exportDate}
+  </div>
+  ${clone.innerHTML}
+  <div style="margin-top: 40pt; padding-top: 12pt; border-top: 1px solid #e2e8f0; font-size: 9pt; color: #94a3b8;">
+    Generated from Beacon Platform - ${window.location.href}
+  </div>
+</body>
+</html>`;
 
-    // Also create JSON backup
-    const jsonBackup = JSON.stringify(data, null, 2);
+    // Download as .doc (Word opens HTML files)
+    const blob = new Blob([wordDoc], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Beacon_${pageId}_${version.replace('.', '-')}_${new Date().toISOString().split('T')[0]}.doc`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 
-    // Download both files
-    downloadFile('beacon_edits_backup.md', md, 'text/markdown');
-    setTimeout(() => {
-      downloadFile('beacon_full_backup.json', jsonBackup, 'application/json');
-    }, 500);
-
-    showNotification('Backup downloaded! (MD + JSON)');
+    showNotification('Word document downloaded!');
   } catch (err) {
     console.error('Export error:', err);
     showNotification('Export failed: ' + err.message, 'error');
   }
 }
 
-function downloadFile(filename, content, mimeType) {
-  const blob = new Blob([content], { type: mimeType });
+async function showEditHistory() {
+  document.getElementById('beacon-edit-history-panel')?.remove();
+  document.getElementById('beacon-edit-history-backdrop')?.remove();
+
+  // Fetch version history if not loaded
+  if (!versionHistory.length && supabase) {
+    const { data } = await supabase
+      .from('page_versions')
+      .select('*')
+      .eq('page', pageId)
+      .order('updated_at', { ascending: false });
+    versionHistory = data || [];
+  }
+
+  const panel = document.createElement('div');
+  panel.id = 'beacon-edit-history-panel';
+  panel.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h3 style="margin:0;font-size:18px;color:#1e293b;">Edit History</h3>
+      <button onclick="this.closest('#beacon-edit-history-panel').remove();document.getElementById('beacon-edit-history-backdrop')?.remove();" style="
+        background:none; border:none; font-size:24px; cursor:pointer; color:#64748b; line-height:1;
+      ">&times;</button>
+    </div>
+    <p style="color:#64748b;font-size:13px;margin-bottom:16px;">
+      ${versionHistory.length} versions saved. Click any version to see changes or revert.
+    </p>
+    <div style="max-height:500px;overflow-y:auto;">
+      ${versionHistory.length === 0 ? '<p style="color:#94a3b8;text-align:center;padding:20px;">No edit history yet</p>' : ''}
+      ${versionHistory.map((v, i) => {
+        const content = typeof v.content === 'string' ? JSON.parse(v.content) : v.content;
+        const editCount = Object.keys(content).length;
+        const isLatest = i === 0;
+        return `
+        <div style="
+          padding:16px; border-radius:8px; margin-bottom:12px;
+          background:${isLatest ? '#f0fdfa' : '#f8fafc'};
+          border:1px solid ${isLatest ? '#14b8a6' : '#e2e8f0'};
+        ">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+            <div style="flex:1;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                <strong style="font-size:15px;">v${v.version_major}.${v.version_minor}</strong>
+                ${isLatest ? '<span style="background:#14b8a6;color:white;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;">CURRENT</span>' : ''}
+              </div>
+              <div style="font-size:12px;color:#64748b;">
+                by <strong>${v.updated_by || 'Unknown'}</strong> &bull; ${formatTime(v.updated_at)}
+              </div>
+              <div style="font-size:12px;color:#94a3b8;margin-top:4px;">
+                ${editCount} elements edited
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button onclick="showVersionDetails(${v.id})" style="
+                background:#e2e8f0; color:#475569; border:none;
+                padding:6px 12px; border-radius:4px; font-size:12px; cursor:pointer;
+              ">Details</button>
+              ${!isLatest ? `<button onclick="revertToVersion(${v.id})" style="
+                background:#f59e0b; color:white; border:none;
+                padding:6px 12px; border-radius:4px; font-size:12px; cursor:pointer;
+              ">Revert</button>` : ''}
+            </div>
+          </div>
+        </div>
+      `}).join('')}
+    </div>
+    <div style="margin-top:16px;padding-top:16px;border-top:1px solid #e2e8f0;">
+      <button onclick="exportVersionsJSON()" style="
+        background:#6366f1; color:white; border:none;
+        padding:10px 16px; border-radius:6px; font-size:13px; cursor:pointer; width:100%;
+      ">Download Full History (JSON)</button>
+    </div>
+  `;
+  panel.style.cssText = `
+    position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+    z-index:100000; background:white; padding:24px;
+    border-radius:12px; box-shadow:0 20px 60px rgba(0,0,0,0.3);
+    font-family:system-ui,sans-serif; width:500px; max-width:90vw;
+  `;
+  document.body.appendChild(panel);
+
+  // Add backdrop
+  const backdrop = document.createElement('div');
+  backdrop.id = 'beacon-edit-history-backdrop';
+  backdrop.onclick = () => { panel.remove(); backdrop.remove(); };
+  backdrop.style.cssText = `
+    position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:99999;
+  `;
+  document.body.insertBefore(backdrop, panel);
+}
+
+async function showVersionDetails(versionId) {
+  const version = versionHistory.find(v => v.id === versionId);
+  if (!version) return;
+
+  const content = typeof version.content === 'string' ? JSON.parse(version.content) : version.content;
+  const entries = Object.entries(content);
+
+  // Create details panel
+  const detailsPanel = document.createElement('div');
+  detailsPanel.id = 'beacon-version-details';
+  detailsPanel.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h3 style="margin:0;font-size:16px;">v${version.version_major}.${version.version_minor} - Edit Details</h3>
+      <button onclick="this.closest('#beacon-version-details').remove()" style="
+        background:none; border:none; font-size:20px; cursor:pointer; color:#64748b;
+      ">&times;</button>
+    </div>
+    <div style="font-size:12px;color:#64748b;margin-bottom:12px;">
+      ${entries.length} elements changed by ${version.updated_by}
+    </div>
+    <div style="max-height:400px;overflow-y:auto;">
+      ${entries.slice(0, 50).map(([selector, html]) => {
+        const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+        const preview = text.slice(0, 150);
+        return `
+        <div style="padding:10px;border-bottom:1px solid #f1f5f9;">
+          <div style="font-family:monospace;font-size:11px;color:#7c3aed;margin-bottom:4px;word-break:break-all;">
+            ${selector}
+          </div>
+          <div style="font-size:12px;color:#475569;">
+            ${preview}${text.length > 150 ? '...' : ''}
+          </div>
+        </div>
+      `}).join('')}
+      ${entries.length > 50 ? `<div style="padding:12px;text-align:center;color:#94a3b8;font-size:12px;">
+        ... and ${entries.length - 50} more edits
+      </div>` : ''}
+    </div>
+  `;
+  detailsPanel.style.cssText = `
+    position:fixed; top:50%; left:calc(50% + 280px); transform:translate(-50%,-50%);
+    z-index:100001; background:white; padding:20px;
+    border-radius:10px; box-shadow:0 10px 40px rgba(0,0,0,0.2);
+    font-family:system-ui,sans-serif; width:400px; max-width:40vw;
+  `;
+
+  document.getElementById('beacon-version-details')?.remove();
+  document.body.appendChild(detailsPanel);
+}
+
+async function exportVersionsJSON() {
+  if (!versionHistory.length) {
+    showNotification('No versions to export', 'error');
+    return;
+  }
+
+  const jsonBackup = JSON.stringify(versionHistory, null, 2);
+  const blob = new Blob([jsonBackup], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = filename;
+  a.download = `beacon_history_${pageId}_${new Date().toISOString().split('T')[0]}.json`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+
+  showNotification('History exported!');
 }
 
 // Global functions
@@ -570,4 +807,7 @@ window.revertToVersion = revertToVersion;
 window.formatText = formatText;
 window.changeFontSize = changeFontSize;
 window.cancelEdits = cancelEdits;
-window.exportToFile = exportToFile;
+window.exportToWord = exportToWord;
+window.showEditHistory = showEditHistory;
+window.showVersionDetails = showVersionDetails;
+window.exportVersionsJSON = exportVersionsJSON;
