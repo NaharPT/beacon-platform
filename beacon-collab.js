@@ -210,6 +210,14 @@ function addEditUI() {
   const container = document.createElement('div');
   container.id = 'beacon-edit-ui';
   container.innerHTML = `
+    <button id="beacon-export-btn" onclick="exportToFile()" style="
+      background:linear-gradient(135deg,#f59e0b,#d97706);
+      color:white; border:none; padding:12px 24px; border-radius:8px;
+      font-size:14px; font-weight:600; cursor:pointer;
+      box-shadow:0 4px 12px rgba(245,158,11,0.4);
+      transition:transform 0.2s; margin-right:8px;
+    " onmouseover="this.style.transform='scale(1.05)'"
+       onmouseout="this.style.transform='scale(1)'" title="Download backup of all edits">Export</button>
     <button id="beacon-cancel-btn" onclick="cancelEdits()" style="
       background:linear-gradient(135deg,#64748b,#475569);
       color:white; border:none; padding:12px 24px; border-radius:8px;
@@ -488,6 +496,73 @@ function showNotification(message, type = 'success') {
   setTimeout(() => notif.remove(), 4000);
 }
 
+async function exportToFile() {
+  showNotification('Exporting edits...');
+
+  try {
+    // Fetch all versions from Supabase
+    const { data, error } = await supabase
+      .from('page_versions')
+      .select('*')
+      .order('updated_at', { ascending: false });
+
+    if (error) throw error;
+
+    // Create markdown content
+    let md = `# Beacon Platform - Edit Backup\n\n`;
+    md += `Exported: ${new Date().toLocaleString()}\n`;
+    md += `Total versions: ${data.length}\n\n---\n\n`;
+
+    for (const v of data) {
+      md += `## Version ${v.version_major}.${v.version_minor}\n`;
+      md += `- **Updated by:** ${v.updated_by}\n`;
+      md += `- **Updated at:** ${v.updated_at}\n`;
+      md += `- **Page:** ${v.page}\n\n`;
+
+      const content = typeof v.content === 'string' ? JSON.parse(v.content) : v.content;
+      const selectorCount = Object.keys(content).length;
+      md += `Edited ${selectorCount} elements.\n\n`;
+
+      // Show first 10 edits as preview
+      const entries = Object.entries(content).slice(0, 10);
+      for (const [selector, html] of entries) {
+        const text = html.replace(/<[^>]+>/g, ' ').replace(/\\s+/g, ' ').trim().slice(0, 100);
+        md += `- \`${selector}\`: ${text}...\n`;
+      }
+      if (selectorCount > 10) {
+        md += `- ... and ${selectorCount - 10} more edits\n`;
+      }
+      md += `\n---\n\n`;
+    }
+
+    // Also create JSON backup
+    const jsonBackup = JSON.stringify(data, null, 2);
+
+    // Download both files
+    downloadFile('beacon_edits_backup.md', md, 'text/markdown');
+    setTimeout(() => {
+      downloadFile('beacon_full_backup.json', jsonBackup, 'application/json');
+    }, 500);
+
+    showNotification('Backup downloaded! (MD + JSON)');
+  } catch (err) {
+    console.error('Export error:', err);
+    showNotification('Export failed: ' + err.message, 'error');
+  }
+}
+
+function downloadFile(filename, content, mimeType) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 // Global functions
 window.toggleEditMode = toggleEditMode;
 window.showVersionHistory = showVersionHistory;
@@ -495,3 +570,4 @@ window.revertToVersion = revertToVersion;
 window.formatText = formatText;
 window.changeFontSize = changeFontSize;
 window.cancelEdits = cancelEdits;
+window.exportToFile = exportToFile;
