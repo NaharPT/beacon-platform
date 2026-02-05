@@ -1,0 +1,402 @@
+/**
+ * Beacon Collaborative Editing System
+ * - Anyone with link can edit
+ * - Version tracking (v1.0, v1.1, etc.)
+ * - Full version history with revert
+ * - Real-time sync across all viewers
+ */
+
+let supabase = null;
+let currentVersion = { major: 1, minor: 0 };
+let versionHistory = [];
+let isEditMode = false;
+let pageId = window.location.pathname.split('/').pop().replace('.html', '') || 'index';
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', initBeacon);
+
+async function initBeacon() {
+  // Check if Supabase is configured
+  if (typeof SUPABASE_URL === 'undefined' || SUPABASE_URL === 'YOUR_SUPABASE_URL') {
+    console.log('Beacon: Supabase not configured. See SETUP.md');
+    addVersionBadge('Local Mode', 'Setup Supabase to enable collaboration');
+    addEditUI();
+    return;
+  }
+
+  // Initialize Supabase client
+  const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+  supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  // Load current version and history
+  await loadVersionHistory();
+
+  // Subscribe to real-time updates
+  subscribeToChanges();
+
+  // Add edit UI
+  addEditUI();
+}
+
+async function loadVersionHistory() {
+  const { data, error } = await supabase
+    .from('page_versions')
+    .select('*')
+    .eq('page', pageId)
+    .order('updated_at', { ascending: false });
+
+  if (error) {
+    console.error('Beacon: Load error', error);
+    return;
+  }
+
+  versionHistory = data || [];
+
+  if (versionHistory.length > 0) {
+    const latest = versionHistory[0];
+    currentVersion = { major: latest.version_major || 1, minor: latest.version_minor || 0 };
+    applyContent(latest.content);
+    addVersionBadge(
+      `v${currentVersion.major}.${currentVersion.minor}`,
+      `by ${latest.updated_by || 'Unknown'} - ${formatTime(latest.updated_at)}`
+    );
+  } else {
+    addVersionBadge('v1.0', 'Initial version');
+  }
+}
+
+function applyContent(content) {
+  if (!content) return;
+  const data = typeof content === 'string' ? JSON.parse(content) : content;
+  Object.entries(data).forEach(([selector, html]) => {
+    try {
+      const el = document.querySelector(selector);
+      if (el) el.innerHTML = html;
+    } catch (e) {
+      // Invalid selector, skip
+    }
+  });
+}
+
+function subscribeToChanges() {
+  supabase
+    .channel('version_changes')
+    .on('postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'page_versions', filter: `page=eq.${pageId}` },
+      (payload) => {
+        if (!isEditMode) {
+          loadVersionHistory();
+          showNotification('Page updated by ' + (payload.new.updated_by || 'someone'));
+        }
+      }
+    )
+    .subscribe();
+}
+
+function addVersionBadge(version, subtitle) {
+  document.getElementById('beacon-version-badge')?.remove();
+
+  const badge = document.createElement('div');
+  badge.id = 'beacon-version-badge';
+  badge.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span style="font-weight:600;font-size:14px">${version}</span>
+      ${versionHistory.length > 1 ? `<button onclick="showVersionHistory()" style="
+        background:rgba(255,255,255,0.2); border:none; color:white;
+        padding:2px 8px; border-radius:4px; font-size:11px; cursor:pointer;
+      ">History</button>` : ''}
+    </div>
+    <div style="font-size:11px;opacity:0.8;margin-top:2px">${subtitle}</div>
+  `;
+  badge.style.cssText = `
+    position:fixed; top:20px; left:20px; z-index:99999;
+    background:rgba(30,58,95,0.95); color:white;
+    padding:12px 16px; border-radius:8px;
+    font-family:system-ui,sans-serif;
+    box-shadow:0 4px 12px rgba(0,0,0,0.15);
+  `;
+  document.body.appendChild(badge);
+}
+
+function showVersionHistory() {
+  document.getElementById('beacon-history-panel')?.remove();
+
+  const panel = document.createElement('div');
+  panel.id = 'beacon-history-panel';
+  panel.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h3 style="margin:0;font-size:16px;">Version History</h3>
+      <button onclick="this.parentElement.parentElement.remove()" style="
+        background:none; border:none; font-size:20px; cursor:pointer; color:#64748b;
+      ">&times;</button>
+    </div>
+    <div style="max-height:400px;overflow-y:auto;">
+      ${versionHistory.map((v, i) => `
+        <div style="
+          padding:12px; border-radius:6px; margin-bottom:8px;
+          background:${i === 0 ? '#dbeafe' : '#f1f5f9'};
+          border:1px solid ${i === 0 ? '#3b82f6' : '#e2e8f0'};
+        ">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <strong>v${v.version_major}.${v.version_minor}</strong>
+              ${i === 0 ? '<span style="background:#3b82f6;color:white;padding:2px 6px;border-radius:4px;font-size:10px;margin-left:8px;">CURRENT</span>' : ''}
+              <div style="font-size:12px;color:#64748b;margin-top:4px;">
+                by ${v.updated_by || 'Unknown'} - ${formatTime(v.updated_at)}
+              </div>
+            </div>
+            ${i > 0 ? `<button onclick="revertToVersion(${v.id})" style="
+              background:#f59e0b; color:white; border:none;
+              padding:6px 12px; border-radius:4px; font-size:12px; cursor:pointer;
+            ">Revert</button>` : ''}
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+  panel.style.cssText = `
+    position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+    z-index:100000; background:white; padding:24px;
+    border-radius:12px; box-shadow:0 20px 60px rgba(0,0,0,0.3);
+    font-family:system-ui,sans-serif; min-width:400px; max-width:500px;
+  `;
+  document.body.appendChild(panel);
+
+  // Add backdrop
+  const backdrop = document.createElement('div');
+  backdrop.id = 'beacon-history-backdrop';
+  backdrop.onclick = () => { panel.remove(); backdrop.remove(); };
+  backdrop.style.cssText = `
+    position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:99999;
+  `;
+  document.body.insertBefore(backdrop, panel);
+}
+
+async function revertToVersion(versionId) {
+  const version = versionHistory.find(v => v.id === versionId);
+  if (!version) return;
+
+  const editorName = prompt('Your name (for revert history):', localStorage.getItem('beacon-editor') || '');
+  if (!editorName) return;
+  localStorage.setItem('beacon-editor', editorName);
+
+  // Create a new version with the old content
+  const newMinor = currentVersion.minor + 1;
+
+  const { error } = await supabase
+    .from('page_versions')
+    .insert({
+      page: pageId,
+      content: version.content,
+      version_major: currentVersion.major,
+      version_minor: newMinor,
+      updated_by: `${editorName} (reverted to v${version.version_major}.${version.version_minor})`
+    });
+
+  if (error) {
+    showNotification('Revert failed!', 'error');
+    return;
+  }
+
+  // Close panel and reload
+  document.getElementById('beacon-history-panel')?.remove();
+  document.getElementById('beacon-history-backdrop')?.remove();
+  await loadVersionHistory();
+  showNotification(`Reverted to v${version.version_major}.${version.version_minor}`);
+}
+
+function addEditUI() {
+  const container = document.createElement('div');
+  container.id = 'beacon-edit-ui';
+  container.innerHTML = `
+    <button id="beacon-edit-btn" onclick="toggleEditMode()" style="
+      background:linear-gradient(135deg,#3b82f6,#1d4ed8);
+      color:white; border:none; padding:12px 24px; border-radius:8px;
+      font-size:14px; font-weight:600; cursor:pointer;
+      box-shadow:0 4px 12px rgba(59,130,246,0.4);
+      transition:transform 0.2s;
+    " onmouseover="this.style.transform='scale(1.05)'"
+       onmouseout="this.style.transform='scale(1)'">Edit</button>
+  `;
+  container.style.cssText = `
+    position:fixed; bottom:20px; right:20px; z-index:99999;
+    font-family:system-ui,sans-serif;
+  `;
+  document.body.appendChild(container);
+}
+
+function toggleEditMode() {
+  isEditMode = !isEditMode;
+  const btn = document.getElementById('beacon-edit-btn');
+
+  if (isEditMode) {
+    enableEditing();
+    btn.textContent = 'Save';
+    btn.style.background = 'linear-gradient(135deg,#10b981,#059669)';
+    showNotification('Edit mode ON - Click any text to edit');
+  } else {
+    saveChanges();
+  }
+}
+
+function enableEditing() {
+  const editableSelectors = [
+    'h1', 'h2', 'h3',
+    '.tagline', '.subtitle',
+    '.card h2', '.card h3', '.card p',
+    'p', 'li', 'td', 'th',
+    '.hero .stat .num', '.hero .stat .label'
+  ];
+
+  editableSelectors.forEach(selector => {
+    document.querySelectorAll(selector).forEach(el => {
+      if (el.closest('#beacon-edit-ui') || el.closest('#beacon-version-badge') ||
+          el.closest('#beacon-history-panel')) return;
+
+      el.setAttribute('contenteditable', 'true');
+      el.style.outline = '2px dashed rgba(59,130,246,0.3)';
+      el.style.outlineOffset = '2px';
+      el.style.cursor = 'text';
+      el.addEventListener('focus', handleEditFocus);
+      el.addEventListener('blur', handleEditBlur);
+    });
+  });
+}
+
+function handleEditFocus(e) {
+  e.target.style.outline = '2px solid #3b82f6';
+  e.target.style.background = 'rgba(59,130,246,0.05)';
+}
+
+function handleEditBlur(e) {
+  e.target.style.outline = '2px dashed rgba(59,130,246,0.3)';
+  e.target.style.background = '';
+}
+
+function disableEditing() {
+  document.querySelectorAll('[contenteditable="true"]').forEach(el => {
+    el.removeAttribute('contenteditable');
+    el.style.outline = '';
+    el.style.outlineOffset = '';
+    el.style.background = '';
+    el.style.cursor = '';
+    el.removeEventListener('focus', handleEditFocus);
+    el.removeEventListener('blur', handleEditBlur);
+  });
+}
+
+async function saveChanges() {
+  const editorName = prompt('Your name (for version history):', localStorage.getItem('beacon-editor') || '');
+  if (!editorName) {
+    isEditMode = true;
+    return;
+  }
+  localStorage.setItem('beacon-editor', editorName);
+
+  // Collect content
+  const content = {};
+  document.querySelectorAll('[contenteditable="true"]').forEach(el => {
+    const selector = getUniqueSelector(el);
+    if (selector) content[selector] = el.innerHTML;
+  });
+
+  disableEditing();
+  const btn = document.getElementById('beacon-edit-btn');
+  btn.textContent = 'Saving...';
+  btn.disabled = true;
+
+  const newMinor = currentVersion.minor + 1;
+
+  if (supabase) {
+    const { error } = await supabase
+      .from('page_versions')
+      .insert({
+        page: pageId,
+        content: content,
+        version_major: currentVersion.major,
+        version_minor: newMinor,
+        updated_by: editorName
+      });
+
+    if (error) {
+      console.error('Beacon: Save error', error);
+      showNotification('Save failed! Check console.', 'error');
+      btn.textContent = 'Edit';
+      btn.disabled = false;
+      btn.style.background = 'linear-gradient(135deg,#3b82f6,#1d4ed8)';
+      return;
+    }
+  }
+
+  currentVersion.minor = newMinor;
+  await loadVersionHistory();
+
+  btn.textContent = 'Edit';
+  btn.disabled = false;
+  btn.style.background = 'linear-gradient(135deg,#3b82f6,#1d4ed8)';
+  showNotification(`Saved as v${currentVersion.major}.${currentVersion.minor}!`);
+}
+
+function getUniqueSelector(el) {
+  if (el.id) return `#${el.id}`;
+
+  const path = [];
+  while (el && el.nodeType === Node.ELEMENT_NODE) {
+    let selector = el.tagName.toLowerCase();
+    if (el.id) {
+      path.unshift(`#${el.id}`);
+      break;
+    }
+    if (el.className && typeof el.className === 'string') {
+      const classes = el.className.trim().split(/\s+/)
+        .filter(c => c && !c.startsWith('beacon-'));
+      if (classes.length) selector += '.' + classes.join('.');
+    }
+    const siblings = el.parentNode
+      ? Array.from(el.parentNode.children).filter(e => e.tagName === el.tagName)
+      : [];
+    if (siblings.length > 1) {
+      selector += `:nth-of-type(${siblings.indexOf(el) + 1})`;
+    }
+    path.unshift(selector);
+    el = el.parentNode;
+    if (el === document.body) break;
+  }
+  return path.join(' > ');
+}
+
+function formatTime(isoString) {
+  const d = new Date(isoString);
+  const now = new Date();
+  const diff = now - d;
+
+  if (diff < 60000) return 'just now';
+  if (diff < 3600000) return `${Math.floor(diff/60000)}m ago`;
+  if (diff < 86400000) return `${Math.floor(diff/3600000)}h ago`;
+  if (diff < 604800000) return `${Math.floor(diff/86400000)}d ago`;
+
+  return d.toLocaleDateString();
+}
+
+function showNotification(message, type = 'success') {
+  document.getElementById('beacon-notification')?.remove();
+
+  const notif = document.createElement('div');
+  notif.id = 'beacon-notification';
+  notif.textContent = message;
+  notif.style.cssText = `
+    position:fixed; bottom:80px; right:20px; z-index:99999;
+    background:${type === 'error' ? '#fee2e2' : '#d1fae5'};
+    color:${type === 'error' ? '#991b1b' : '#065f46'};
+    padding:12px 20px; border-radius:8px;
+    font-family:system-ui,sans-serif; font-size:14px;
+    box-shadow:0 4px 12px rgba(0,0,0,0.1);
+  `;
+  document.body.appendChild(notif);
+  setTimeout(() => notif.remove(), 4000);
+}
+
+// Global functions
+window.toggleEditMode = toggleEditMode;
+window.showVersionHistory = showVersionHistory;
+window.revertToVersion = revertToVersion;
