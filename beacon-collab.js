@@ -11,6 +11,7 @@ let currentVersion = { major: 1, minor: 0 };
 let versionHistory = [];
 let isEditMode = false;
 let pageId = window.location.pathname.split('/').pop().replace('.html', '') || 'index';
+let originalContent = {}; // Store content before editing to detect actual changes
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', initBeacon);
@@ -340,6 +341,9 @@ function removeFormatToolbar() {
 }
 
 function enableEditing() {
+  // Reset original content tracker
+  originalContent = {};
+
   const editableSelectors = [
     'h1', 'h2', 'h3',
     '.tagline', '.subtitle',
@@ -352,6 +356,12 @@ function enableEditing() {
     document.querySelectorAll(selector).forEach(el => {
       if (el.closest('#beacon-edit-ui') || el.closest('#beacon-version-badge') ||
           el.closest('#beacon-history-panel') || el.closest('#beacon-format-toolbar')) return;
+
+      // Store original content BEFORE enabling editing
+      const elSelector = getUniqueSelector(el);
+      if (elSelector) {
+        originalContent[elSelector] = el.innerHTML;
+      }
 
       el.setAttribute('contenteditable', 'true');
       el.style.outline = '2px dashed rgba(20,184,166,0.3)';
@@ -392,19 +402,41 @@ function disableEditing() {
 }
 
 async function saveChanges() {
-  const editorName = prompt('Your name (for version history):', localStorage.getItem('beacon-editor') || '');
+  // Collect ONLY changed content (compare to original)
+  const changedContent = {};
+  let changeCount = 0;
+
+  document.querySelectorAll('[contenteditable="true"]').forEach(el => {
+    const selector = getUniqueSelector(el);
+    if (selector) {
+      const currentHtml = el.innerHTML;
+      const originalHtml = originalContent[selector];
+
+      // Only include if actually changed
+      if (currentHtml !== originalHtml) {
+        changedContent[selector] = currentHtml;
+        changeCount++;
+      }
+    }
+  });
+
+  // If nothing changed, don't create a new version
+  if (changeCount === 0) {
+    disableEditing();
+    const btn = document.getElementById('beacon-edit-btn');
+    btn.textContent = 'Edit';
+    btn.style.background = 'linear-gradient(135deg,#14b8a6,#7c3aed)';
+    document.getElementById('beacon-cancel-btn').style.display = 'none';
+    showNotification('No changes detected');
+    return;
+  }
+
+  const editorName = prompt(`Save ${changeCount} change${changeCount > 1 ? 's' : ''}? Enter your name:`, localStorage.getItem('beacon-editor') || '');
   if (!editorName) {
     isEditMode = true;
     return;
   }
   localStorage.setItem('beacon-editor', editorName);
-
-  // Collect content
-  const content = {};
-  document.querySelectorAll('[contenteditable="true"]').forEach(el => {
-    const selector = getUniqueSelector(el);
-    if (selector) content[selector] = el.innerHTML;
-  });
 
   disableEditing();
   const btn = document.getElementById('beacon-edit-btn');
@@ -418,7 +450,7 @@ async function saveChanges() {
       .from('page_versions')
       .insert({
         page: pageId,
-        content: content,
+        content: changedContent,
         version_major: currentVersion.major,
         version_minor: newMinor,
         updated_by: editorName
@@ -442,7 +474,7 @@ async function saveChanges() {
   btn.disabled = false;
   btn.style.background = 'linear-gradient(135deg,#14b8a6,#7c3aed)';
   document.getElementById('beacon-cancel-btn').style.display = 'none';
-  showNotification(`Saved as v${currentVersion.major}.${currentVersion.minor}!`);
+  showNotification(`Saved ${changeCount} change${changeCount > 1 ? 's' : ''} as v${currentVersion.major}.${currentVersion.minor}!`);
 }
 
 function getUniqueSelector(el) {
@@ -504,130 +536,129 @@ function showNotification(message, type = 'success') {
   setTimeout(() => notif.remove(), 4000);
 }
 
-function exportToWord() {
-  showNotification('Exporting to Word...');
+async function exportToWord() {
+  showNotification('Preparing document...');
 
   try {
-    // Get the main content area (exclude UI elements)
-    const mainContent = document.querySelector('main') || document.querySelector('.content') || document.body;
+    // Load docx library dynamically
+    const { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell,
+            WidthType, BorderStyle, AlignmentType } = await import('https://esm.sh/docx@8.5.0');
 
-    // Clone to avoid modifying the page
-    const clone = mainContent.cloneNode(true);
-
-    // Remove beacon UI elements from clone
-    clone.querySelectorAll('[id^="beacon-"], .materials-panel, script, style').forEach(el => el.remove());
-
-    // Get page title
-    const title = document.querySelector('h1')?.textContent || 'Beacon Document';
+    const title = document.querySelector('h1')?.textContent?.trim() || 'Beacon Document';
     const version = `v${currentVersion.major}.${currentVersion.minor}`;
     const exportDate = new Date().toLocaleDateString('en-US', {
       year: 'numeric', month: 'long', day: 'numeric'
     });
 
-    // Create Word-compatible HTML document
-    const wordDoc = `
-<!DOCTYPE html>
-<html xmlns:o="urn:schemas-microsoft-com:office:office"
-      xmlns:w="urn:schemas-microsoft-com:office:word"
-      xmlns="http://www.w3.org/TR/REC-html40">
-<head>
-  <meta charset="utf-8">
-  <title>${title}</title>
-  <!--[if gte mso 9]>
-  <xml>
-    <w:WordDocument>
-      <w:View>Print</w:View>
-      <w:Zoom>100</w:Zoom>
-      <w:DoNotOptimizeForBrowser/>
-    </w:WordDocument>
-  </xml>
-  <![endif]-->
-  <style>
-    @page {
-      size: A4;
-      margin: 2.5cm 2cm 2cm 2cm;
-    }
-    body {
-      font-family: Calibri, Arial, sans-serif;
-      font-size: 11pt;
-      line-height: 1.5;
-      color: #333;
-    }
-    h1 {
-      font-size: 24pt;
-      color: #0d9488;
-      border-bottom: 2px solid #0d9488;
-      padding-bottom: 8pt;
-      margin-bottom: 16pt;
-    }
-    h2 {
-      font-size: 16pt;
-      color: #7c3aed;
-      margin-top: 20pt;
-      margin-bottom: 10pt;
-    }
-    h3 {
-      font-size: 13pt;
-      color: #475569;
-      margin-top: 14pt;
-    }
-    p { margin: 8pt 0; }
-    ul, ol { margin: 8pt 0 8pt 20pt; }
-    li { margin: 4pt 0; }
-    table {
-      border-collapse: collapse;
-      width: 100%;
-      margin: 12pt 0;
-    }
-    th, td {
-      border: 1px solid #e2e8f0;
-      padding: 8pt 10pt;
-      text-align: left;
-    }
-    th {
-      background: #f1f5f9;
-      font-weight: bold;
-    }
-    .header-info {
-      color: #64748b;
-      font-size: 10pt;
-      margin-bottom: 20pt;
-    }
-    .card {
-      border: 1px solid #e2e8f0;
-      padding: 12pt;
-      margin: 10pt 0;
-      background: #fafafa;
-    }
-    code, pre {
-      font-family: Consolas, monospace;
-      font-size: 10pt;
-      background: #f1f5f9;
-      padding: 2pt 4pt;
-    }
-    pre {
-      padding: 10pt;
-      overflow-x: auto;
-    }
-  </style>
-</head>
-<body>
-  <div class="header-info">
-    <strong>Beacon Platform</strong> | ${version} | Exported: ${exportDate}
-  </div>
-  ${clone.innerHTML}
-  <div style="margin-top: 40pt; padding-top: 12pt; border-top: 1px solid #e2e8f0; font-size: 9pt; color: #94a3b8;">
-    Generated from Beacon Platform - ${window.location.href}
-  </div>
-</body>
-</html>`;
+    // Collect document sections
+    const children = [];
 
-    // Download as .doc (Word opens HTML files)
-    const blob = new Blob([wordDoc], { type: 'application/msword' });
+    // Title
+    children.push(new Paragraph({
+      children: [new TextRun({ text: title, bold: true, size: 48, color: '0d9488' })],
+      heading: HeadingLevel.TITLE,
+      spacing: { after: 200 }
+    }));
+
+    // Metadata line
+    children.push(new Paragraph({
+      children: [new TextRun({ text: `Beacon Platform | ${version} | ${exportDate}`, size: 20, color: '64748b' })],
+      spacing: { after: 400 }
+    }));
+
+    // Process main content sections
+    const sections = document.querySelectorAll('section[id], .card, article');
+    sections.forEach(section => {
+      // Skip UI elements
+      if (section.closest('#beacon-edit-ui') || section.closest('.materials-panel')) return;
+
+      // Section heading
+      const heading = section.querySelector('h2, h3');
+      if (heading) {
+        const level = heading.tagName === 'H2' ? HeadingLevel.HEADING_1 : HeadingLevel.HEADING_2;
+        children.push(new Paragraph({
+          children: [new TextRun({ text: heading.textContent.trim(), bold: true, size: level === HeadingLevel.HEADING_1 ? 32 : 26, color: '7c3aed' })],
+          heading: level,
+          spacing: { before: 300, after: 100 }
+        }));
+      }
+
+      // Process paragraphs
+      section.querySelectorAll('p').forEach(p => {
+        if (p.closest('h1, h2, h3')) return;
+        const text = p.textContent.trim();
+        if (text) {
+          children.push(new Paragraph({
+            children: [new TextRun({ text, size: 22 })],
+            spacing: { after: 120 }
+          }));
+        }
+      });
+
+      // Process lists
+      section.querySelectorAll('ul, ol').forEach(list => {
+        list.querySelectorAll('li').forEach(li => {
+          const text = li.textContent.trim();
+          if (text) {
+            children.push(new Paragraph({
+              children: [new TextRun({ text: '  - ' + text, size: 22 })],
+              spacing: { after: 60 }
+            }));
+          }
+        });
+      });
+
+      // Process tables
+      section.querySelectorAll('table').forEach(table => {
+        const rows = [];
+        table.querySelectorAll('tr').forEach(tr => {
+          const cells = [];
+          tr.querySelectorAll('th, td').forEach(cell => {
+            const isHeader = cell.tagName === 'TH';
+            cells.push(new TableCell({
+              children: [new Paragraph({
+                children: [new TextRun({ text: cell.textContent.trim(), bold: isHeader, size: 20 })]
+              })],
+              shading: isHeader ? { fill: 'f1f5f9' } : undefined
+            }));
+          });
+          if (cells.length) rows.push(new TableRow({ children: cells }));
+        });
+        if (rows.length) {
+          children.push(new Table({
+            rows,
+            width: { size: 100, type: WidthType.PERCENTAGE }
+          }));
+          children.push(new Paragraph({ children: [], spacing: { after: 200 } }));
+        }
+      });
+    });
+
+    // Footer
+    children.push(new Paragraph({
+      children: [new TextRun({ text: '---', size: 20, color: 'e2e8f0' })],
+      spacing: { before: 400 }
+    }));
+    children.push(new Paragraph({
+      children: [new TextRun({ text: `Generated from Beacon Platform - ${window.location.href}`, size: 18, color: '94a3b8', italics: true })]
+    }));
+
+    // Create document
+    const doc = new Document({
+      sections: [{
+        properties: {
+          page: { margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 } }
+        },
+        children
+      }]
+    });
+
+    // Generate and download
+    const blob = await Packer.toBlob(doc);
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Beacon_${pageId}_${version.replace('.', '-')}_${new Date().toISOString().split('T')[0]}.doc`;
+    a.download = `Beacon_${pageId}_${version.replace('.', '-')}_${new Date().toISOString().split('T')[0]}.docx`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -636,6 +667,58 @@ function exportToWord() {
     showNotification('Word document downloaded!');
   } catch (err) {
     console.error('Export error:', err);
+    // Fallback to simple HTML export if docx library fails
+    exportToWordFallback();
+  }
+}
+
+function exportToWordFallback() {
+  try {
+    const mainContent = document.body;
+    const clone = mainContent.cloneNode(true);
+    clone.querySelectorAll('[id^="beacon-"], .materials-panel, script, style, nav, .sidebar').forEach(el => el.remove());
+
+    const title = document.querySelector('h1')?.textContent || 'Beacon Document';
+    const version = `v${currentVersion.major}.${currentVersion.minor}`;
+    const exportDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+    const wordDoc = `<!DOCTYPE html>
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word">
+<head><meta charset="utf-8"><title>${title}</title>
+<style>
+  @page { size: A4; margin: 2.5cm; }
+  body { font-family: Calibri, sans-serif; font-size: 11pt; line-height: 1.6; color: #333; max-width: 800px; }
+  h1 { font-size: 24pt; color: #0d9488; border-bottom: 2px solid #0d9488; padding-bottom: 8pt; }
+  h2 { font-size: 16pt; color: #7c3aed; margin-top: 24pt; page-break-after: avoid; }
+  h3 { font-size: 13pt; color: #475569; }
+  p { margin: 8pt 0; }
+  ul, ol { margin: 8pt 0 8pt 24pt; }
+  li { margin: 4pt 0; }
+  table { border-collapse: collapse; width: 100%; margin: 12pt 0; }
+  th, td { border: 1px solid #cbd5e1; padding: 8pt; text-align: left; }
+  th { background: #f1f5f9; font-weight: bold; }
+  .header-info { color: #64748b; font-size: 10pt; margin-bottom: 16pt; }
+</style></head>
+<body>
+  <div class="header-info"><strong>Beacon Platform</strong> | ${version} | ${exportDate}</div>
+  ${clone.innerHTML}
+  <p style="margin-top: 40pt; border-top: 1px solid #e2e8f0; padding-top: 12pt; font-size: 9pt; color: #94a3b8;">
+    Generated from Beacon Platform
+  </p>
+</body></html>`;
+
+    const blob = new Blob([wordDoc], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Beacon_${pageId}_v${currentVersion.major}-${currentVersion.minor}_${new Date().toISOString().split('T')[0]}.doc`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    showNotification('Document downloaded (basic format)');
+  } catch (err) {
     showNotification('Export failed: ' + err.message, 'error');
   }
 }
@@ -808,6 +891,7 @@ window.formatText = formatText;
 window.changeFontSize = changeFontSize;
 window.cancelEdits = cancelEdits;
 window.exportToWord = exportToWord;
+window.exportToWordFallback = exportToWordFallback;
 window.showEditHistory = showEditHistory;
 window.showVersionDetails = showVersionDetails;
 window.exportVersionsJSON = exportVersionsJSON;
