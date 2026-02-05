@@ -1495,16 +1495,69 @@ function updateActive() {
 window.addEventListener('scroll', updateActive);
 updateActive();
 
-// --- Presentation Materials Management ---
-const STORAGE_KEY = 'beacon-presentation-materials';
+// --- Presentation Materials Management (IndexedDB for large files) ---
+const DB_NAME = 'BeaconMaterialsDB';
+const DB_VERSION = 1;
+const STORE_NAME = 'materials';
+let db = null;
 
-function loadMaterials() {
-  const stored = localStorage.getItem(STORAGE_KEY);
-  return stored ? JSON.parse(stored) : [];
+// Initialize IndexedDB
+function initDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => { db = request.result; resolve(db); };
+    request.onupgradeneeded = (e) => {
+      const database = e.target.result;
+      if (!database.objectStoreNames.contains(STORE_NAME)) {
+        database.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+      }
+    };
+  });
 }
 
-function saveMaterials(materials) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(materials));
+async function loadMaterials() {
+  if (!db) await initDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const store = tx.objectStore(STORE_NAME);
+    const request = store.getAll();
+    request.onsuccess = () => resolve(request.result || []);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function saveMaterial(material) {
+  if (!db) await initDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    const request = store.add(material);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function deleteMaterialById(id) {
+  if (!db) await initDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    const request = store.delete(id);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function clearAllMaterialsDB() {
+  if (!db) await initDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    const request = store.clear();
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
 }
 
 function getFileIcon(filename) {
@@ -1518,27 +1571,28 @@ function getFileIcon(filename) {
   return icons[ext] || 'FILE';
 }
 
-function renderMaterials() {
+async function renderMaterials() {
   const slideList = document.getElementById('slideList');
-  const materials = loadMaterials();
+  const materials = await loadMaterials();
 
   if (materials.length === 0) {
-    slideList.innerHTML = '<div class="empty-state">No materials yet.<br>Use "Add Link" for large files.</div>';
+    slideList.innerHTML = '<div class="empty-state">No materials yet.<br>Drop files or use Add Link.</div>';
     return;
   }
 
-  slideList.innerHTML = materials.map((item, index) => `
-    <div class="slide-item" data-index="${index}" onclick="openMaterial(${index})" style="cursor:pointer;" title="Click to open">
+  slideList.innerHTML = materials.map((item) => `
+    <div class="slide-item" data-id="${item.id}" onclick="openMaterial(${item.id})" style="cursor:pointer;" title="Click to open">
       <div class="slide-icon">${item.isLink ? 'LINK' : getFileIcon(item.name)}</div>
       <div class="slide-title">${item.name}</div>
-      <button class="delete-btn" onclick="deleteMaterial(${index}, event)" title="Delete">&times;</button>
+      <button class="delete-btn" onclick="deleteMaterial(${item.id}, event)" title="Delete">&times;</button>
     </div>
   `).join('');
 }
 
-function openMaterial(index) {
-  const materials = loadMaterials();
-  const item = materials[index];
+async function openMaterial(id) {
+  const materials = await loadMaterials();
+  const item = materials.find(m => m.id === id);
+  if (!item) return;
 
   // Handle external links
   if (item.isLink) {
@@ -1546,25 +1600,17 @@ function openMaterial(index) {
     return;
   }
 
-  if (!item.dataUrl) {
+  if (!item.blob) {
     showPanelNotification('File content not available - re-add the file', 'error');
     return;
   }
 
-  // Convert base64 back to blob and open
-  const byteString = atob(item.dataUrl.split(',')[1]);
-  const mimeType = item.type || 'application/octet-stream';
-  const ab = new ArrayBuffer(byteString.length);
-  const ia = new Uint8Array(ab);
-  for (let i = 0; i < byteString.length; i++) {
-    ia[i] = byteString.charCodeAt(i);
-  }
-  const blob = new Blob([ab], { type: mimeType });
-  const url = URL.createObjectURL(blob);
+  // Create URL from stored blob
+  const url = URL.createObjectURL(item.blob);
 
   // For viewable types, open in new tab; otherwise download
   const viewableTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/gif', 'image/webp'];
-  if (viewableTypes.includes(mimeType)) {
+  if (viewableTypes.includes(item.type)) {
     window.open(url, '_blank');
   } else {
     // Trigger download for non-viewable files (PPT, DOC, XLS)
@@ -1578,8 +1624,8 @@ function openMaterial(index) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function addMaterial(file) {
-  const materials = loadMaterials();
+async function addMaterial(file) {
+  const materials = await loadMaterials();
 
   // Check for duplicates
   if (materials.some(m => m.name === file.name)) {
@@ -1587,55 +1633,44 @@ function addMaterial(file) {
     return;
   }
 
-  // Read file as base64 data URL
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    const dataUrl = e.target.result;
-
-    materials.push({
+  try {
+    // Store the file blob directly in IndexedDB (supports large files!)
+    await saveMaterial({
       name: file.name,
       size: file.size,
       type: file.type,
-      dataUrl: dataUrl,
+      blob: file,
       addedAt: new Date().toISOString()
     });
-
-    try {
-      saveMaterials(materials);
-      renderMaterials();
-      showPanelNotification('Added: ' + file.name);
-    } catch (err) {
-      // localStorage quota exceeded
-      showPanelNotification('Storage full - remove some files first', 'error');
-    }
-  };
-  reader.onerror = function() {
-    showPanelNotification('Error reading file', 'error');
-  };
-  reader.readAsDataURL(file);
+    await renderMaterials();
+    const sizeMB = (file.size / 1024 / 1024).toFixed(1);
+    showPanelNotification(`Added: ${file.name} (${sizeMB} MB)`);
+  } catch (err) {
+    console.error('Storage error:', err);
+    showPanelNotification('Storage error - try clearing storage first', 'error');
+  }
 }
 
-function deleteMaterial(index, event) {
+async function deleteMaterial(id, event) {
   event.stopPropagation();
-  const materials = loadMaterials();
-  const item = materials[index];
+  const materials = await loadMaterials();
+  const item = materials.find(m => m.id === id);
 
-  if (confirm(`Delete "${item.name}" from presentation materials?`)) {
-    materials.splice(index, 1);
-    saveMaterials(materials);
-    renderMaterials();
+  if (item && confirm(`Delete "${item.name}" from presentation materials?`)) {
+    await deleteMaterialById(id);
+    await renderMaterials();
     showPanelNotification('Deleted: ' + item.name);
   }
 }
 
-function addLinkMaterial() {
+async function addLinkMaterial() {
   const name = prompt('Name for this link:');
   if (!name) return;
 
   const url = prompt('URL (e.g., OneDrive, Google Drive, SharePoint link):');
   if (!url) return;
 
-  const materials = loadMaterials();
+  const materials = await loadMaterials();
 
   // Check for duplicates
   if (materials.some(m => m.name === name)) {
@@ -1643,38 +1678,33 @@ function addLinkMaterial() {
     return;
   }
 
-  materials.push({
+  await saveMaterial({
     name: name,
     url: url,
     isLink: true,
     addedAt: new Date().toISOString()
   });
 
-  saveMaterials(materials);
-  renderMaterials();
+  await renderMaterials();
   showPanelNotification('Added link: ' + name);
 }
 
-function clearAllMaterials() {
-  // Calculate total storage used
-  let totalSize = 0;
-  for (let key in localStorage) {
-    if (localStorage.hasOwnProperty(key)) {
-      totalSize += localStorage[key].length * 2; // UTF-16 = 2 bytes per char
-    }
+async function clearAllMaterials() {
+  const materials = await loadMaterials();
+
+  if (materials.length === 0) {
+    showPanelNotification('Already empty', 'error');
+    return;
   }
-  const usedMB = (totalSize / 1024 / 1024).toFixed(2);
 
-  const choice = confirm(
-    `Storage used: ${usedMB} MB\n\n` +
-    `Click OK to clear ALL site storage (materials, slide edits, etc.)\n` +
-    `Click Cancel to abort.`
-  );
+  // Calculate total size
+  let totalSize = materials.reduce((sum, m) => sum + (m.size || 0), 0);
+  const sizeMB = (totalSize / 1024 / 1024).toFixed(1);
 
-  if (choice) {
-    localStorage.clear();
-    renderMaterials();
-    showPanelNotification('All storage cleared!');
+  if (confirm(`Clear ${materials.length} item(s) (${sizeMB} MB)?`)) {
+    await clearAllMaterialsDB();
+    await renderMaterials();
+    showPanelNotification('All materials cleared!');
   }
 }
 
@@ -1728,8 +1758,11 @@ fileInput.addEventListener('change', (e) => {
   fileInput.value = ''; // Reset for next selection
 });
 
-// Initialize
-renderMaterials();
+// Initialize IndexedDB and render materials
+initDB().then(() => renderMaterials()).catch(err => {
+  console.error('DB init error:', err);
+  document.getElementById('slideList').innerHTML = '<div class="empty-state">Storage error. Try refreshing.</div>';
+});
 </script>
 
 </body>
