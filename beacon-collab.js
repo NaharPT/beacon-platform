@@ -110,10 +110,10 @@ function addVersionBadge(version, subtitle) {
   `;
   badge.style.cssText = `
     position:fixed; top:20px; right:20px; z-index:99999;
-    background:rgba(30,58,95,0.95); color:white;
+    background:linear-gradient(135deg,#0d9488,#7c3aed); color:white;
     padding:12px 16px; border-radius:8px;
     font-family:system-ui,sans-serif;
-    box-shadow:0 4px 12px rgba(0,0,0,0.15);
+    box-shadow:0 4px 12px rgba(15,118,110,0.3);
   `;
   document.body.appendChild(badge);
 }
@@ -134,13 +134,13 @@ function showVersionHistory() {
       ${versionHistory.map((v, i) => `
         <div style="
           padding:12px; border-radius:6px; margin-bottom:8px;
-          background:${i === 0 ? '#dbeafe' : '#f1f5f9'};
-          border:1px solid ${i === 0 ? '#3b82f6' : '#e2e8f0'};
+          background:${i === 0 ? '#ccfbf1' : '#f1f5f9'};
+          border:1px solid ${i === 0 ? '#14b8a6' : '#e2e8f0'};
         ">
           <div style="display:flex;justify-content:space-between;align-items:center;">
             <div>
               <strong>v${v.version_major}.${v.version_minor}</strong>
-              ${i === 0 ? '<span style="background:#3b82f6;color:white;padding:2px 6px;border-radius:4px;font-size:10px;margin-left:8px;">CURRENT</span>' : ''}
+              ${i === 0 ? '<span style="background:#14b8a6;color:white;padding:2px 6px;border-radius:4px;font-size:10px;margin-left:8px;">CURRENT</span>' : ''}
               <div style="font-size:12px;color:#64748b;margin-top:4px;">
                 by ${v.updated_by || 'Unknown'} - ${formatTime(v.updated_at)}
               </div>
@@ -218,10 +218,10 @@ function addEditUI() {
     " onmouseover="this.style.transform='scale(1.05)'"
        onmouseout="this.style.transform='scale(1)'">Cancel</button>
     <button id="beacon-edit-btn" onclick="toggleEditMode()" style="
-      background:linear-gradient(135deg,#3b82f6,#1d4ed8);
+      background:linear-gradient(135deg,#14b8a6,#7c3aed);
       color:white; border:none; padding:12px 24px; border-radius:8px;
       font-size:14px; font-weight:600; cursor:pointer;
-      box-shadow:0 4px 12px rgba(59,130,246,0.4);
+      box-shadow:0 4px 12px rgba(20,184,166,0.4);
       transition:transform 0.2s;
     " onmouseover="this.style.transform='scale(1.05)'"
        onmouseout="this.style.transform='scale(1)'">Edit</button>
@@ -257,7 +257,7 @@ function cancelEdits() {
   const cancelBtn = document.getElementById('beacon-cancel-btn');
 
   btn.textContent = 'Edit';
-  btn.style.background = 'linear-gradient(135deg,#3b82f6,#1d4ed8)';
+  btn.style.background = 'linear-gradient(135deg,#14b8a6,#7c3aed)';
   cancelBtn.style.display = 'none';
 
   // Reload page to discard unsaved changes
@@ -337,7 +337,7 @@ function enableEditing() {
           el.closest('#beacon-history-panel') || el.closest('#beacon-format-toolbar')) return;
 
       el.setAttribute('contenteditable', 'true');
-      el.style.outline = '2px dashed rgba(59,130,246,0.3)';
+      el.style.outline = '2px dashed rgba(20,184,166,0.3)';
       el.style.outlineOffset = '2px';
       el.style.cursor = 'text';
       el.addEventListener('focus', handleEditFocus);
@@ -350,12 +350,12 @@ function enableEditing() {
 }
 
 function handleEditFocus(e) {
-  e.target.style.outline = '2px solid #3b82f6';
-  e.target.style.background = 'rgba(59,130,246,0.05)';
+  e.target.style.outline = '2px solid #14b8a6';
+  e.target.style.background = 'rgba(20,184,166,0.05)';
 }
 
 function handleEditBlur(e) {
-  e.target.style.outline = '2px dashed rgba(59,130,246,0.3)';
+  e.target.style.outline = '2px dashed rgba(20,184,166,0.3)';
   e.target.style.background = '';
 }
 
@@ -412,7 +412,7 @@ async function saveChanges() {
       showNotification('Save failed! Check console.', 'error');
       btn.textContent = 'Edit';
       btn.disabled = false;
-      btn.style.background = 'linear-gradient(135deg,#3b82f6,#1d4ed8)';
+      btn.style.background = 'linear-gradient(135deg,#14b8a6,#7c3aed)';
       document.getElementById('beacon-cancel-btn').style.display = 'none';
       return;
     }
@@ -423,7 +423,7 @@ async function saveChanges() {
 
   btn.textContent = 'Edit';
   btn.disabled = false;
-  btn.style.background = 'linear-gradient(135deg,#3b82f6,#1d4ed8)';
+  btn.style.background = 'linear-gradient(135deg,#14b8a6,#7c3aed)';
   document.getElementById('beacon-cancel-btn').style.display = 'none';
   showNotification(`Saved as v${currentVersion.major}.${currentVersion.minor}!`);
 }

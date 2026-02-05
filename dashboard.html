@@ -6,22 +6,24 @@
 <title>Beacon — Execution Approach</title>
 <style>
 :root {
-  --bg: #f1f5f9;
+  --bg: #f0fdfa;
   --card: #ffffff;
-  --primary: #1e3a5f;
-  --accent: #3b82f6;
-  --accent-light: #dbeafe;
-  --text: #1e293b;
-  --text-secondary: #64748b;
-  --border: #e2e8f0;
+  --primary: #0f766e;
+  --accent: #a855f7;
+  --accent-light: #f3e8ff;
+  --text: #134e4a;
+  --text-secondary: #0f766e;
+  --border: #ccfbf1;
   --green: #16a34a;
   --green-bg: #dcfce7;
   --amber: #d97706;
   --amber-bg: #fef3c7;
   --red: #dc2626;
   --red-bg: #fee2e2;
-  --purple: #7c3aed;
-  --purple-bg: #ede9fe;
+  --purple: #a855f7;
+  --purple-bg: #f3e8ff;
+  --teal: #14b8a6;
+  --teal-light: #99f6e4;
   --sidebar-w: 260px;
   --radius: 8px;
 }
@@ -50,13 +52,13 @@ nav.sidebar a:hover, nav.sidebar a.active { color: #fff; background: rgba(255,25
 main { margin-left: var(--sidebar-w); padding: 32px 40px 80px; max-width: 1100px; }
 
 /* Hero */
-.hero { background: linear-gradient(135deg, var(--primary) 0%, #2563eb 100%); color: #fff; border-radius: var(--radius); padding: 48px; margin-bottom: 32px; }
+.hero { background: linear-gradient(135deg, #0d9488 0%, #7c3aed 50%, #a855f7 100%); color: #fff; border-radius: var(--radius); padding: 48px; margin-bottom: 32px; }
 .hero h1 { font-size: 36px; margin-bottom: 8px; }
-.hero .subtitle { font-size: 16px; color: #bfdbfe; margin-bottom: 24px; }
+.hero .subtitle { font-size: 16px; color: #ccfbf1; margin-bottom: 24px; }
 .hero .stats { display: flex; gap: 32px; flex-wrap: wrap; }
 .hero .stat { text-align: center; }
 .hero .stat .num { font-size: 32px; font-weight: 700; }
-.hero .stat .label { font-size: 12px; color: #bfdbfe; text-transform: uppercase; letter-spacing: 1px; }
+.hero .stat .label { font-size: 12px; color: #ccfbf1; text-transform: uppercase; letter-spacing: 1px; }
 
 /* Sections */
 section { margin-bottom: 40px; }
@@ -113,11 +115,11 @@ details .detail-body { padding: 0 20px 20px; }
 
 /* Timeline */
 .timeline { position: relative; padding-left: 28px; }
-.timeline::before { content: ''; position: absolute; left: 8px; top: 4px; bottom: 4px; width: 2px; background: var(--accent); }
+.timeline::before { content: ''; position: absolute; left: 8px; top: 4px; bottom: 4px; width: 2px; background: linear-gradient(180deg, #14b8a6, #a855f7); }
 .timeline-item { position: relative; margin-bottom: 20px; }
 .timeline-item::before {
   content: ''; position: absolute; left: -24px; top: 6px; width: 12px; height: 12px;
-  border-radius: 50%; background: var(--accent); border: 2px solid #fff;
+  border-radius: 50%; background: #14b8a6; border: 2px solid #fff;
 }
 .timeline-item h4 { font-size: 14px; color: var(--primary); }
 .timeline-item p { font-size: 13px; color: var(--text-secondary); }
@@ -893,12 +895,12 @@ WHERE last_updated &lt; NOW() - INTERVAL '90 days'
   <div class="callout"><strong>Goal:</strong> 15-20 curated initiatives loaded to standard. Q&A answers 10 standard questions. New initiative onboardable in &lt;30 min.</div>
 
   <div class="roadmap-bar">
-    <div style="flex:0.5; background: #64748b;">Pre-W0</div>
-    <div style="flex:1; background: #3b82f6;">W1</div>
-    <div style="flex:1; background: #2563eb;">W2</div>
-    <div style="flex:1; background: #1d4ed8;">W3</div>
-    <div style="flex:1; background: #1e40af;">W4</div>
-    <div style="flex:1; background: #1e3a8a;">W5-6</div>
+    <div style="flex:0.5; background: #5eead4;">Pre-W0</div>
+    <div style="flex:1; background: #14b8a6;">W1</div>
+    <div style="flex:1; background: #0d9488;">W2</div>
+    <div style="flex:1; background: #7c3aed;">W3</div>
+    <div style="flex:1; background: #9333ea;">W4</div>
+    <div style="flex:1; background: #a855f7;">W5-6</div>
   </div>
 
   <details open>
@@ -1006,10 +1008,10 @@ WHERE last_updated &lt; NOW() - INTERVAL '90 days'
   <div class="callout"><strong>Target:</strong> 50 initiatives, 80% searchable, 60% leadership-visible, &lt;20% stale. 2-week sprint cadence.</div>
 
   <div class="roadmap-bar">
-    <div style="flex:2; background: #3b82f6;">S1-2: Innovators</div>
-    <div style="flex:2; background: #d97706;">S3-4: Team Leads</div>
+    <div style="flex:2; background: #14b8a6;">S1-2: Innovators</div>
+    <div style="flex:2; background: #0d9488;">S3-4: Team Leads</div>
     <div style="flex:2; background: #7c3aed;">S5-6: Leadership</div>
-    <div style="flex:2; background: #16a34a;">S7-8: Pilot</div>
+    <div style="flex:2; background: #a855f7;">S7-8: Pilot</div>
   </div>
 
   <details open>
