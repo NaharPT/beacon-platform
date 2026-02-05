@@ -723,10 +723,15 @@ body.edit-mode td.editable:focus { background: rgba(219,234,254,0.15); }
 
 <script>
 // --- Slide Navigation ---
-const slides = document.querySelectorAll('.slide');
+let slides = document.querySelectorAll('.slide');
 const counter = document.getElementById('counter');
 let current = 0;
 let editMode = false;
+
+function refreshSlides() {
+  slides = document.querySelectorAll('.slide');
+  counter.textContent = (current + 1) + ' / ' + slides.length;
+}
 
 function show(n) {
   if (n < 0 || n >= slides.length) return;
@@ -762,12 +767,14 @@ const originalHTML = deckEl.innerHTML;
   const saved = localStorage.getItem(STORAGE_KEY);
   if (saved) {
     deckEl.innerHTML = saved;
-    // Re-query slides after restore
+    // Re-query slides after restore (critical for navigation to work!)
+    refreshSlides();
     document.getElementById('editStatus').textContent = 'Saved edits loaded';
     // Re-init: show first slide
-    document.querySelectorAll('.slide').forEach((s, i) => {
+    slides.forEach((s, i) => {
       s.classList.toggle('active', i === 0);
     });
+    current = 0;
   }
 })();
 
@@ -841,11 +848,12 @@ function resetEdits(e) {
   if (!confirm('Reset all edits to the original version?')) return;
   localStorage.removeItem(STORAGE_KEY);
   deckEl.innerHTML = originalHTML;
-  document.querySelectorAll('.slide').forEach((s, i) => {
+  refreshSlides();
+  slides.forEach((s, i) => {
     s.classList.toggle('active', i === 0);
   });
   current = 0;
-  counter.textContent = '1 / ' + document.querySelectorAll('.slide').length;
+  counter.textContent = '1 / ' + slides.length;
   if (editMode) toggleEdit();
   document.getElementById('editStatus').textContent = 'Reset to original';
 }
